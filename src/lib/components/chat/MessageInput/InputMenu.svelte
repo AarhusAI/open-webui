@@ -153,6 +153,7 @@
 						</DropdownMenu.Item>
 					</Tooltip>
 
+                    {#if $user?.role === 'admin' || $user?.permissions.chat?.image_capture}
 					<Tooltip
 						content={fileUploadCapableModels.length !== selectedModels.length
 							? $i18n.t('Model(s) do not support file upload')
@@ -183,6 +184,7 @@
 							<div class=" line-clamp-1">{$i18n.t('Capture')}</div>
 						</DropdownMenu.Item>
 					</Tooltip>
+                    {/if}
 
 					<Tooltip
 						content={fileUploadCapableModels.length !== selectedModels.length
@@ -239,35 +241,37 @@
 						</Tooltip>
 					{/if}
 
-					<Tooltip
-						content={fileUploadCapableModels.length !== selectedModels.length
-							? $i18n.t('Model(s) do not support file upload')
-							: !fileUploadEnabled
-								? $i18n.t('You do not have permission to upload files.')
-								: ''}
-						className="w-full"
-					>
-						<button
-							class="flex gap-2 w-full items-center px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl {!fileUploadEnabled
-								? 'opacity-50'
-								: ''}"
-							on:click={() => {
-								tab = 'knowledge';
-							}}
+					{#if $user?.role === 'admin' || $user?.permissions.chat?.attach_knowledge}
+						<Tooltip
+							content={fileUploadCapableModels.length !== selectedModels.length
+								? $i18n.t('Model(s) do not support file upload')
+								: !fileUploadEnabled
+									? $i18n.t('You do not have permission to upload files.')
+									: ''}
+							className="w-full"
 						>
-							<Database />
+							<button
+								class="flex gap-2 w-full items-center px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl {!fileUploadEnabled
+									? 'opacity-50'
+									: ''}"
+								on:click={() => {
+									tab = 'knowledge';
+								}}
+							>
+								<Database />
 
-							<div class="flex items-center w-full justify-between">
-								<div class=" line-clamp-1">
-									{$i18n.t('Attach Knowledge')}
-								</div>
+								<div class="flex items-center w-full justify-between">
+									<div class=" line-clamp-1">
+										{$i18n.t('Attach Knowledge')}
+									</div>
 
-								<div class="text-gray-500">
-									<ChevronRight />
+									<div class="text-gray-500">
+										<ChevronRight />
+									</div>
 								</div>
-							</div>
-						</button>
-					</Tooltip>
+							</button>
+						</Tooltip>
+					{/if}
 
 					{#if ($chats ?? []).length > 0}
 						<Tooltip

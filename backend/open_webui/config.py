@@ -1368,6 +1368,14 @@ USER_PERMISSIONS_CHAT_SYSTEM_PROMPT = (
     os.environ.get("USER_PERMISSIONS_CHAT_SYSTEM_PROMPT", "True").lower() == "true"
 )
 
+USER_PERMISSIONS_CHAT_IMAGE_CAPTURE = (
+    os.environ.get("USER_PERMISSIONS_CHAT_IMAGE_CAPTURE", "True").lower() == "true"
+)
+
+USER_PERMISSIONS_CHAT_ATTACH_KONWLEDGE = (
+    os.environ.get("USER_PERMISSIONS_CHAT_ATTACH_KONWLEDGE", "True").lower() == "true"
+)
+
 USER_PERMISSIONS_CHAT_PARAMS = (
     os.environ.get("USER_PERMISSIONS_CHAT_PARAMS", "True").lower() == "true"
 )
@@ -1509,6 +1517,8 @@ DEFAULT_USER_PERMISSIONS = {
         "controls": USER_PERMISSIONS_CHAT_CONTROLS,
         "valves": USER_PERMISSIONS_CHAT_VALVES,
         "system_prompt": USER_PERMISSIONS_CHAT_SYSTEM_PROMPT,
+        "image_capture": USER_PERMISSIONS_CHAT_IMAGE_CAPTURE,
+        "attach_knowledge": USER_PERMISSIONS_CHAT_ATTACH_KONWLEDGE,
         "params": USER_PERMISSIONS_CHAT_PARAMS,
         "file_upload": USER_PERMISSIONS_CHAT_FILE_UPLOAD,
         "delete": USER_PERMISSIONS_CHAT_DELETE,
