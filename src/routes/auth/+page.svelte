@@ -27,10 +27,6 @@
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 	import { redirect } from '@sveltejs/kit';
 
-    // PATCH EXTRA LOGIN INFO
-	import Banner from '$lib/components/common/Banner.svelte';
-	// /PATCH EXTRA LOGIN INFO
-
 	const i18n = getContext('i18n');
 
 	let loaded = false;
@@ -419,16 +415,41 @@
 							</form>
 							<!-- PATCH EXTRA LOGIN INFO -->
 							{#if $config?.extended_features?.system_register_url && $config?.extended_features?.system_register_guide_url}
-								<Banner
-									banner={{
-										timestamp: Math.floor(Date.now() / 1000),
-										type: 'info',
-										id: '1',
-										dismissible: false,
-										title: 'Vigtigt før du logger ind første gang!',
-										content: `<div>Du skal have adgang til AI-Platform i Aarhus Kommunes Systemregister.</div><div><a target="_blank" rel="noopener noreferrer" class='underline' href='${$config?.extended_features?.system_register_url}'>Anmod om adgang i systemregistret</a></div>.</div><div>Du kan <a target="_blank" rel="noopener noreferrer" class='underline' href='${$config?.extended_features?.system_register_guide_url}'>hente en vejledning til hvordan man anmoder om adgang til systemregistret</a></div>`
-									}}
-								></Banner>
+								<div
+									class="mx-4 px-3 flex justify-center items-center border border-gray-100 dark:border-gray-850 text-gray-800 dark:text-gary-100 bg-white dark:bg-gray-900"
+								>
+									<div class="flex flex-col md:items-center text-sm w-fit gap-1.5">
+										<div
+											class="m-4 bg-blue-500/20 text-blue-700 dark:text-blue-200 text-xs font-bold w-fit px-2 rounded-sm uppercase line-clamp-1 mr-0.5"
+										>
+											{$i18n.t('Info')}
+										</div>
+										<div class="text-xs text-gray-700 dark:text-white max-h-60 overflow-y-auto">
+											<div
+												class="text-xs text-gray-700 dark:text-white max-h-60 overflow-y-auto mb-2"
+											>
+												Du skal anmode om adgang til AarhusAI (AI-platform) i Aarhus Kommunes
+												systemregister, før du logger på første gang.
+											</div>
+											<div class="mb-2">
+												<a
+													target="_blank"
+													class="underline"
+													href="{$config?.extended_features?.system_register_url}"
+													>Anmod om adgang i Systemregisteret.</a
+												>
+											</div>
+											<div class="mb-2">
+												<a
+													target="_blank"
+													class="underline"
+													href="{$config?.extended_features?.system_register_guide_url}"
+													>Vejledning til at anmode om adgang i Systemregisteret på Serviceportalen.</a
+												>
+											</div>
+										</div>
+									</div>
+								</div>
 							{/if}
 							<!-- /PATCH EXTRA LOGIN INFO -->
 							{#if Object.keys($config?.oauth?.providers ?? {}).length > 0}
