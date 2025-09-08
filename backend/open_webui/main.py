@@ -383,6 +383,13 @@ from open_webui.config import (
     DEFAULT_PROMPT_SUGGESTIONS,
     DEFAULT_MODELS,
     DEFAULT_PINNED_MODELS,
+    # PATCH EXTRA LOGIN INFO
+    SYSTEM_REGISTER_URL,
+    SYSTEM_REGISTER_GUIDE_URL,
+    # /PATCH EXTRA LOGIN INFO
+    # PATCH ADD LOGO TO SIDEBAR
+    LOGO_URL,
+    # /PATCH ADD LOGO TO SIDEBAR
     DEFAULT_ARENA_MODEL,
     MODEL_ORDER_LIST,
     EVALUATION_ARENA_MODELS,
@@ -783,6 +790,18 @@ app.state.config.MODEL_ORDER_LIST = MODEL_ORDER_LIST
 app.state.config.DEFAULT_PROMPT_SUGGESTIONS = DEFAULT_PROMPT_SUGGESTIONS
 app.state.config.DEFAULT_USER_ROLE = DEFAULT_USER_ROLE
 app.state.config.DEFAULT_GROUP_ID = DEFAULT_GROUP_ID
+
+
+# PATCH EXTRA LOGIN INFO
+app.state.config.SYSTEM_REGISTER_URL = SYSTEM_REGISTER_URL
+app.state.config.SYSTEM_REGISTER_GUIDE_URL = SYSTEM_REGISTER_GUIDE_URL
+# /PATCH EXTRA LOGIN INFO
+
+
+# PATCH ADD LOGO TO SIDEBAR
+app.state.config.LOGO_URL = LOGO_URL
+# /PATCH ADD LOGO TO SIDEBAR
+
 
 app.state.config.PENDING_USER_OVERLAY_CONTENT = PENDING_USER_OVERLAY_CONTENT
 app.state.config.PENDING_USER_OVERLAY_TITLE = PENDING_USER_OVERLAY_TITLE
@@ -1918,6 +1937,16 @@ async def get_app_config(request: Request):
                 name: config.get("name", name)
                 for name, config in OAUTH_PROVIDERS.items()
             }
+        },
+        # Environment variables for patches
+        "extended_features": {
+            # PATCH EXTRA LOGIN INFO
+            "system_register_url": app.state.config.SYSTEM_REGISTER_URL,
+            "system_register_guide_url": app.state.config.SYSTEM_REGISTER_GUIDE_URL,
+            # /PATCH EXTRA LOGIN INFO
+            # PATCH ADD LOGO TO SIDEBAR
+            "logo_url": app.state.config.LOGO_URL,
+            # /PATCH ADD LOGO TO SIDEBAR
         },
         "features": {
             "auth": WEBUI_AUTH,
