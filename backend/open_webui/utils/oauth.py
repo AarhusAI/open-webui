@@ -128,6 +128,104 @@ auth_manager_config.JWT_EXPIRES_IN = JWT_EXPIRES_IN
 auth_manager_config.OAUTH_UPDATE_PICTURE_ON_LOGIN = OAUTH_UPDATE_PICTURE_ON_LOGIN
 
 
+# PATCH OIDC
+def set_aak_groups(user_data: UserInfo) -> UserInfo:
+    """
+    Set AAK groups based on AAK claims. AAK groups need to be parsed from a collection of AAK claims,
+    so we cannot rely on Open WebUI's claims mapping. Parses the relevant AAK claims and adds them
+    to the "groups" list. This enables us to rely on Open WebUI's role management for user role assignment.
+
+    To ensure unique group names, they are constructed as "<aak_department_name> (<aak_department_id>)".
+
+    Example claims:
+
+    "companyname": [
+        "Aarhus Kommune"
+    ],
+    "division": [
+        "Kultur og Borgerservice"
+    ],
+    "department": [
+        "Borgerservice og Biblioteker"
+    ],
+    "extensionAttribute12": [
+        "ITK"
+    ],
+    "Office": [
+        "ITK Development"
+    ],
+    "extensionAttribute7": [
+        "1001;1004;1012;1103;6530"
+    ]
+
+    The ID's for the departments are given sequentially in "extensionAttribute7". Users in management postitions will
+    not have five levels of AAK groups. This will show in the length of "extensionAttribute7" but will not show in the
+    other claims. In the above example a manager will still have the "Office" claim, but it will repeat the value from
+    "extensionAttribute12" and "extensionAttribute7 will only contain "1001;1004;1012;1103"
+
+    Note: ENABLE_OAUTH_GROUP_MANAGEMENT and ENABLE_OAUTH_GROUP_CREATION must be set to 'true'
+
+    Args:
+        user_data (dict): The decoded OIDC token
+
+    Returns:
+        The decoded OIDC token with the AAK group names added to the "groups" list.
+    """
+
+    log.debug("Running AAK Group management")
+    log.debug(user_data)
+
+    user_data['groups'] = []
+
+    dept_ids = user_data.get("extensionAttribute7", "").split(";")
+    dept_depth = len(dept_ids)
+
+    if "companyname" in user_data and dept_depth >= 1:
+        user_data['groups'].append(user_data.get("companyname", "") + " (" + dept_ids[0] + ")")
+    if "division" in user_data and dept_depth >= 2:
+        user_data['groups'].append(user_data.get("division", "") + " (" + dept_ids[1] + ")")
+    if "department" in user_data and dept_depth >= 3:
+        user_data['groups'].append(user_data.get("department", "") + " (" + dept_ids[2] + ")")
+    if "extensionAttribute12" in user_data and dept_depth >= 4:
+        user_data['groups'].append(user_data.get("extensionAttribute12", "") + " (" + dept_ids[3] + ")")
+    if "Office" in user_data and dept_depth >= 5:
+        user_data['groups'].append(user_data.get("Office", "") + " (" + dept_ids[4] + ")")
+
+    log.debug(f"Using groups {user_data.get('groups', '')}.")
+
+    return user_data
+
+
+def set_aak_role(user_data: UserInfo) -> UserInfo:
+    """
+    Set the AAK role based on AAK claims. For "builders" we cannot map to a native Open WebUI role.
+    Instead, we add the role "Builder" to the list of groups.
+
+    Note: ENABLE_OAUTH_GROUP_MANAGEMENT and ENABLE_OAUTH_GROUP_CREATION must be set to 'true'
+
+    Args:
+        user_data (dict): The decoded OIDC token
+
+    Returns:
+        The decoded OIDC token with the AAK role added to the "groups" list.
+    """
+
+    log.debug("Running AAK Role management")
+    log.debug(user_data)
+
+    claims_roles = user_data.get("role", "")
+
+    log.debug(f"Using aak_claims_role {claims_roles}.")
+
+    if "builder" in claims_roles:
+        user_data['groups'].append("Builder")
+
+    log.debug(f"Using role-groups {user_data.get('groups', '')}.")
+
+    return user_data
+# //PATCH OIDC
+
+
 FERNET = None
 
 if len(OAUTH_CLIENT_INFO_ENCRYPTION_KEY) != 44:
@@ -1318,6 +1416,12 @@ class OAuthManager:
             if not user_data:
                 log.warning(f"OAuth callback failed, user data is missing: {token}")
                 raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+            # PATCH OIDC
+            # Set AAK role and groups
+            user_data = set_aak_groups(user_data=user_data)
+            user_data = set_aak_role(user_data=user_data)
+            # //PATCH OIDC
 
             # Extract the "sub" claim, using custom claim if configured
             if auth_manager_config.OAUTH_SUB_CLAIM:
