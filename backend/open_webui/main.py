@@ -143,6 +143,13 @@ from open_webui.config import (
     DEFAULT_MODEL_PARAMS,
     DEFAULT_MODELS,
     DEFAULT_PINNED_MODELS,
+    # PATCH EXTRA LOGIN INFO
+    SYSTEM_REGISTER_URL,
+    SYSTEM_REGISTER_GUIDE_URL,
+    # /PATCH EXTRA LOGIN INFO
+    # PATCH ADD LOGO TO SIDEBAR
+    LOGO_URL,
+    # /PATCH ADD LOGO TO SIDEBAR
     DEFAULT_PROMPT_SUGGESTIONS,
     DEFAULT_RAG_TEMPLATE,
     DEFAULT_USER_ROLE,
@@ -891,6 +898,18 @@ app.state.config.DEFAULT_MODEL_PARAMS = DEFAULT_MODEL_PARAMS
 app.state.config.DEFAULT_PROMPT_SUGGESTIONS = DEFAULT_PROMPT_SUGGESTIONS
 app.state.config.DEFAULT_USER_ROLE = DEFAULT_USER_ROLE
 app.state.config.DEFAULT_GROUP_ID = DEFAULT_GROUP_ID
+
+
+# PATCH EXTRA LOGIN INFO
+app.state.config.SYSTEM_REGISTER_URL = SYSTEM_REGISTER_URL
+app.state.config.SYSTEM_REGISTER_GUIDE_URL = SYSTEM_REGISTER_GUIDE_URL
+# /PATCH EXTRA LOGIN INFO
+
+
+# PATCH ADD LOGO TO SIDEBAR
+app.state.config.LOGO_URL = LOGO_URL
+# /PATCH ADD LOGO TO SIDEBAR
+
 
 app.state.config.PENDING_USER_OVERLAY_CONTENT = PENDING_USER_OVERLAY_CONTENT
 app.state.config.PENDING_USER_OVERLAY_TITLE = PENDING_USER_OVERLAY_TITLE
@@ -2405,6 +2424,16 @@ async def get_app_config(request: Request):
         'oauth': {
             'providers': {name: config.get('name', name) for name, config in OAUTH_PROVIDERS.items()},
             'auto_redirect': app.state.config.OAUTH_AUTO_REDIRECT,
+        },
+        # Environment variables for patches
+        'extended_features': {
+            # PATCH EXTRA LOGIN INFO
+            'system_register_url': app.state.config.SYSTEM_REGISTER_URL,
+            'system_register_guide_url': app.state.config.SYSTEM_REGISTER_GUIDE_URL,
+            # /PATCH EXTRA LOGIN INFO
+            # PATCH ADD LOGO TO SIDEBAR
+            'logo_url': app.state.config.LOGO_URL,
+            # /PATCH ADD LOGO TO SIDEBAR
         },
         'features': {
             # --- Public: required by login/signup page pre-auth ---

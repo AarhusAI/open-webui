@@ -2494,6 +2494,32 @@ ENABLE_SIGNUP = ConfigVar(
     (False if not WEBUI_AUTH else os.getenv('ENABLE_SIGNUP', 'True').lower() == 'true'),
 )
 
+
+# PATCH EXTRA LOGIN INFO
+SYSTEM_REGISTER_URL = PersistentConfig(
+    "SYSTEM_REGISTER_URL",
+    "ui.SYSTEM_REGISTER_URL",
+    os.environ.get("SYSTEM_REGISTER_URL", ""),
+)
+
+
+SYSTEM_REGISTER_GUIDE_URL = PersistentConfig(
+    "SYSTEM_REGISTER_GUIDE_URL",
+    "ui.SYSTEM_REGISTER_GUIDE_URL",
+    os.environ.get("SYSTEM_REGISTER_GUIDE_URL", ""),
+)
+# /PATCH EXTRA LOGIN INFO
+
+
+# PATCH ADD LOGO TO SIDEBAR
+LOGO_URL = PersistentConfig(
+    "LOGO_URL",
+    "ui.LOGO_URL",
+    os.environ.get("LOGO_URL", ""),
+)
+# /PATCH ADD LOGO TO SIDEBAR
+
+
 ENABLE_LOGIN_FORM = ConfigVar(
     'ENABLE_LOGIN_FORM',
     'ui.enable_login_form',
