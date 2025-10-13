@@ -240,7 +240,7 @@
 			await gotoAuth();
 			return;
 		}
-		if (!['user', 'admin'].includes($user?.role)) {
+		if (['pending'].includes($user?.role)) {
 			return;
 		}
 
