@@ -365,6 +365,7 @@ def get_filtered_models(models, user, db=None):
     # Filter out models that the user does not have access to
     if (
         user.role == "user"
+        or user.role == "builder"
         or (user.role == "admin" and not BYPASS_ADMIN_ACCESS_CONTROL)
     ) and not BYPASS_MODEL_ACCESS_CONTROL:
         model_ids = [model["id"] for model in models if not model.get("arena")]
