@@ -1568,6 +1568,7 @@ class OAuthManager:
                             role = 'user'
                         else:
                             role = first_role
+                        matched = True
                         break
                 for admin_role in oauth_admin_roles:
                     if admin_role in oauth_roles:
