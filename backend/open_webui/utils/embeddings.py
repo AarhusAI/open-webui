@@ -68,7 +68,7 @@ async def generate_embeddings(
 
     # Access filtering
     if not getattr(request.state, "direct", False):
-        if not bypass_filter and user.role == "user":
+        if not bypass_filter and (user.role == "user" or user.role == "builder"):
             check_model_access(user, model)
 
     # Ollama backend
