@@ -40,7 +40,10 @@ from open_webui.config import (
     ENABLE_OAUTH_SIGNUP,
     JWT_EXPIRES_IN,
     OAUTH_ACCESS_TOKEN_REQUEST_INCLUDE_CLIENT_ID,
-    AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING,  # PATCH OIDC
+    AAK_OAUTH_GROUP_CLAIMS,  # PATCH OIDC
+    AAK_OAUTH_GROUP_ID_CLAIM,  # PATCH OIDC
+    AAK_OAUTH_GROUP_ID_SEPARATOR,  # PATCH OIDC
+    AAK_OAUTH_DEBUG_FORCE_ROLE,  # PATCH OIDC
     OAUTH_ADMIN_ROLES,
     OAUTH_ALLOWED_DOMAINS,
     OAUTH_ALLOWED_ROLES,
@@ -1630,6 +1633,11 @@ class OAuthManager:
                         oauth_roles = [claim_data]
                 elif isinstance(claim_data, int):
                     oauth_roles = [str(claim_data)]
+
+            # Debug: Override roles if AAK_OAUTH_DEBUG_FORCE_ROLE is set
+            if AAK_OAUTH_DEBUG_FORCE_ROLE:
+                oauth_roles = [r.strip() for r in AAK_OAUTH_DEBUG_FORCE_ROLE.split(",") if r.strip()]
+                log.warning(f'AAK_OAUTH_DEBUG_FORCE_ROLE is set, overriding oauth_roles to: {oauth_roles}')
 
             log.debug('Oauth Roles claim: %s', oauth_claim)
             log.debug('User roles from oauth: %s', oauth_roles)

@@ -2607,6 +2607,8 @@ AAK_OAUTH_GROUP_CLAIMS = os.environ.get(
 )
 AAK_OAUTH_GROUP_ID_CLAIM = os.environ.get("AAK_OAUTH_GROUP_ID_CLAIM", "extensionAttribute7")
 AAK_OAUTH_GROUP_ID_SEPARATOR = os.environ.get("AAK_OAUTH_GROUP_ID_SEPARATOR", ";")
+# Debug: Override OAuth roles for testing
+AAK_OAUTH_DEBUG_FORCE_ROLE = os.environ.get("AAK_OAUTH_DEBUG_FORCE_ROLE", "")
 # //PATCH OIDC
 
 oauth_group_default_share = os.getenv('OAUTH_GROUP_DEFAULT_SHARE', 'true').strip().lower()
