@@ -41,6 +41,7 @@ from open_webui.config import (
     ENABLE_OAUTH_ROLE_MANAGEMENT,
     ENABLE_OAUTH_GROUP_MANAGEMENT,
     ENABLE_OAUTH_GROUP_CREATION,
+    AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING,  # PATCH OIDC
     OAUTH_BLOCKED_GROUPS,
     OAUTH_GROUPS_SEPARATOR,
     OAUTH_ROLES_SEPARATOR,
@@ -1419,8 +1420,9 @@ class OAuthManager:
 
             # PATCH OIDC
             # Set AAK role and groups
-            user_data = set_aak_groups(user_data=user_data)
-            user_data = set_aak_role(user_data=user_data)
+            if AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING:
+                user_data = set_aak_groups(user_data=user_data)
+                user_data = set_aak_role(user_data=user_data)
             # //PATCH OIDC
 
             # Extract the "sub" claim, using custom claim if configured

@@ -568,6 +568,11 @@ ENABLE_OAUTH_GROUP_CREATION = PersistentConfig(
     os.environ.get("ENABLE_OAUTH_GROUP_CREATION", "False").lower() == "true",
 )
 
+# PATCH OIDC
+AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING = (
+    os.environ.get("AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING", "False").lower() == "true"
+)
+# //PATCH OIDC
 
 OAUTH_BLOCKED_GROUPS = PersistentConfig(
     "OAUTH_BLOCKED_GROUPS",
