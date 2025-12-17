@@ -572,6 +572,13 @@ ENABLE_OAUTH_GROUP_CREATION = PersistentConfig(
 AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING = (
     os.environ.get("AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING", "False").lower() == "true"
 )
+# AAK Group claim configuration
+AAK_OAUTH_GROUP_CLAIMS = os.environ.get(
+    "AAK_OAUTH_GROUP_CLAIMS",
+    '["companyname", "division", "department", "extensionAttribute12", "Office"]'
+)
+AAK_OAUTH_GROUP_ID_CLAIM = os.environ.get("AAK_OAUTH_GROUP_ID_CLAIM", "extensionAttribute7")
+AAK_OAUTH_GROUP_ID_SEPARATOR = os.environ.get("AAK_OAUTH_GROUP_ID_SEPARATOR", ";")
 # //PATCH OIDC
 
 OAUTH_BLOCKED_GROUPS = PersistentConfig(

@@ -42,6 +42,9 @@ from open_webui.config import (
     ENABLE_OAUTH_GROUP_MANAGEMENT,
     ENABLE_OAUTH_GROUP_CREATION,
     AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING,  # PATCH OIDC
+    AAK_OAUTH_GROUP_CLAIMS,  # PATCH OIDC
+    AAK_OAUTH_GROUP_ID_CLAIM,  # PATCH OIDC
+    AAK_OAUTH_GROUP_ID_SEPARATOR,  # PATCH OIDC
     OAUTH_BLOCKED_GROUPS,
     OAUTH_GROUPS_SEPARATOR,
     OAUTH_ROLES_SEPARATOR,
@@ -132,37 +135,14 @@ auth_manager_config.OAUTH_UPDATE_PICTURE_ON_LOGIN = OAUTH_UPDATE_PICTURE_ON_LOGI
 # PATCH OIDC
 def set_aak_groups(user_data: UserInfo) -> UserInfo:
     """
-    Set AAK groups based on AAK claims. AAK groups need to be parsed from a collection of AAK claims,
-    so we cannot rely on Open WebUI's claims mapping. Parses the relevant AAK claims and adds them
-    to the "groups" list. This enables us to rely on Open WebUI's role management for user role assignment.
+    Set AAK groups based on configurable AAK claims. Parses the relevant AAK claims
+    and adds them to the "groups" list.
 
-    To ensure unique group names, they are constructed as "<aak_department_name> (<aak_department_id>)".
-
-    Example claims:
-
-    "companyname": [
-        "Aarhus Kommune"
-    ],
-    "division": [
-        "Kultur og Borgerservice"
-    ],
-    "department": [
-        "Borgerservice og Biblioteker"
-    ],
-    "extensionAttribute12": [
-        "ITK"
-    ],
-    "Office": [
-        "ITK Development"
-    ],
-    "extensionAttribute7": [
-        "1001;1004;1012;1103;6530"
-    ]
-
-    The ID's for the departments are given sequentially in "extensionAttribute7". Users in management postitions will
-    not have five levels of AAK groups. This will show in the length of "extensionAttribute7" but will not show in the
-    other claims. In the above example a manager will still have the "Office" claim, but it will repeat the value from
-    "extensionAttribute12" and "extensionAttribute7 will only contain "1001;1004;1012;1103"
+    Configuration via environment variables:
+    - AAK_OAUTH_GROUP_CLAIMS: JSON array of claim names in hierarchical order
+      Default: '["companyname", "division", "department", "extensionAttribute12", "Office"]'
+    - AAK_OAUTH_GROUP_ID_CLAIM: Claim containing separated IDs (default: extensionAttribute7)
+    - AAK_OAUTH_GROUP_ID_SEPARATOR: Separator for IDs (default: ;)
 
     Note: ENABLE_OAUTH_GROUP_MANAGEMENT and ENABLE_OAUTH_GROUP_CREATION must be set to 'true'
 
@@ -172,25 +152,28 @@ def set_aak_groups(user_data: UserInfo) -> UserInfo:
     Returns:
         The decoded OIDC token with the AAK group names added to the "groups" list.
     """
-
     log.debug("Running AAK Group management")
     log.debug(user_data)
 
     user_data['groups'] = []
 
-    dept_ids = user_data.get("extensionAttribute7", "").split(";")
+    # Parse configured claim names from JSON
+    try:
+        group_claims = json.loads(AAK_OAUTH_GROUP_CLAIMS)
+    except json.JSONDecodeError as e:
+        log.error(f"Failed to parse AAK_OAUTH_GROUP_CLAIMS: {e}")
+        return user_data
+
+    # Get IDs from configured claim
+    dept_ids = user_data.get(AAK_OAUTH_GROUP_ID_CLAIM, "").split(AAK_OAUTH_GROUP_ID_SEPARATOR)
     dept_depth = len(dept_ids)
 
-    if "companyname" in user_data and dept_depth >= 1:
-        user_data['groups'].append(user_data.get("companyname", "") + " (" + dept_ids[0] + ")")
-    if "division" in user_data and dept_depth >= 2:
-        user_data['groups'].append(user_data.get("division", "") + " (" + dept_ids[1] + ")")
-    if "department" in user_data and dept_depth >= 3:
-        user_data['groups'].append(user_data.get("department", "") + " (" + dept_ids[2] + ")")
-    if "extensionAttribute12" in user_data and dept_depth >= 4:
-        user_data['groups'].append(user_data.get("extensionAttribute12", "") + " (" + dept_ids[3] + ")")
-    if "Office" in user_data and dept_depth >= 5:
-        user_data['groups'].append(user_data.get("Office", "") + " (" + dept_ids[4] + ")")
+    # Process each configured level
+    for level, claim_name in enumerate(group_claims):
+        if claim_name and claim_name in user_data and dept_depth >= (level + 1):
+            name = user_data.get(claim_name, "")
+            group_id = dept_ids[level]
+            user_data['groups'].append(f"{name} ({group_id})")
 
     log.debug(f"Using groups {user_data.get('groups', '')}.")
 
