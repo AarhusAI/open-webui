@@ -2596,6 +2596,11 @@ ENABLE_OAUTH_GROUP_MANAGEMENT = os.getenv('ENABLE_OAUTH_GROUP_MANAGEMENT', 'Fals
 
 ENABLE_OAUTH_GROUP_CREATION = os.getenv('ENABLE_OAUTH_GROUP_CREATION', 'False').lower() == 'true'
 
+# PATCH OIDC
+AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING = (
+    os.environ.get("AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING", "False").lower() == "true"
+)
+# //PATCH OIDC
 
 oauth_group_default_share = os.getenv('OAUTH_GROUP_DEFAULT_SHARE', 'true').strip().lower()
 OAUTH_GROUP_DEFAULT_SHARE = 'members' if oauth_group_default_share == 'members' else oauth_group_default_share == 'true'
