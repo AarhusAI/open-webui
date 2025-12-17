@@ -136,8 +136,35 @@ auth_manager_config.OAUTH_UPDATE_PICTURE_ON_LOGIN = OAUTH_UPDATE_PICTURE_ON_LOGI
 # PATCH OIDC
 def set_aak_groups(user_data: UserInfo) -> UserInfo:
     """
-    Set AAK groups based on configurable AAK claims. Parses the relevant AAK claims
-    and adds them to the "groups" list.
+    Set AAK groups based on AAK claims. AAK groups need to be parsed from a collection of AAK claims,
+    so we cannot rely on Open WebUI's claims mapping. Parses the relevant AAK claims and adds them
+    to the "groups" list. This enables us to rely on Open WebUI's role management for user role assignment.
+    To ensure unique group names, they are constructed as "<aak_department_name> (<aak_department_id>)".
+
+    Example claims:
+        "companyname": [
+            "Aarhus Kommune"
+        ],
+        "division": [
+            "Kultur og Borgerservice"
+        ],
+        "department": [
+            "Borgerservice og Biblioteker"
+        ],
+        "extensionAttribute12": [
+            "ITK"
+        ],
+        "Office": [
+            "ITK Development"
+        ],
+        "extensionAttribute7": [
+            "1001;1004;1012;1103;6530"
+        ]
+
+    The ID's for the departments are given sequentially in "extensionAttribute7". Users in management postitions will
+    not have five levels of AAK groups. This will show in the length of "extensionAttribute7" but will not show in the
+    other claims. In the above example a manager will still have the "Office" claim, but it will repeat the value from
+    "extensionAttribute12" and "extensionAttribute7 will only contain "1001;1004;1012;1103"
 
     Configuration via environment variables:
     - AAK_OAUTH_GROUP_CLAIMS: JSON array of claim names in hierarchical order
