@@ -124,7 +124,11 @@ class OAuthSessionTable:
                         "user_id": user_id,
                         "provider": provider,
                         "token": self._encrypt_token(token),
-                        "expires_at": token.get("expires_at"),
+                        "expires_at": token.get("expires_at") or (
+                            int(token.get("issued_at", current_time) + token.get("id_token_expires_in", 3600))
+                            if token.get("id_token_expires_in")
+                            else current_time + 3600
+                        ),
                         "created_at": current_time,
                         "updated_at": current_time,
                     }
