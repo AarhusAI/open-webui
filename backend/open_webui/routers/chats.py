@@ -537,7 +537,7 @@ async def delete_all_user_chats(
     db: Session = Depends(get_session),
 ):
 
-    if user.role == "user" and not has_permission(
+    if (user.role == "user" or user.role == "builder") and not has_permission(
         user.id, "chat.delete", request.app.state.config.USER_PERMISSIONS
     ):
         raise HTTPException(
@@ -876,8 +876,8 @@ async def get_shared_chat_by_id(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.NOT_FOUND
         )
 
-    if user.role == "user" or (user.role == "admin" and not ENABLE_ADMIN_CHAT_ACCESS):
-        chat = Chats.get_chat_by_share_id(share_id, db=db)
+    if (user.role == "user" or user.role == "builder") or (user.role == "admin" and not ENABLE_ADMIN_CHAT_ACCESS):
+        chat = Chats.get_chat_by_share_id(share_id)
     elif user.role == "admin" and ENABLE_ADMIN_CHAT_ACCESS:
         chat = Chats.get_chat_by_id(share_id, db=db)
 

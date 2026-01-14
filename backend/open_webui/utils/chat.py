@@ -201,7 +201,7 @@ async def generate_chat_completion(
         )
     else:
         # Check if user has access to the model
-        if not bypass_filter and user.role == "user":
+        if not bypass_filter and (user.role == "user" or user.role == "builder"):
             try:
                 check_model_access(user, model)
             except Exception as e:
