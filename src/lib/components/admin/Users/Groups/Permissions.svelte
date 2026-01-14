@@ -439,6 +439,38 @@
 			{/if}
 		</div>
 
+        <div class="flex flex-col w-full">
+			<div class="flex w-full justify-between my-1">
+				<div class=" self-center text-xs font-medium">
+					{$i18n.t('Allow Image capture')}
+				</div>
+				<Switch bind:state={permissions.chat.image_capture} />
+			</div>
+			{#if defaultPermissions?.chat?.image_capture && !permissions.chat.image_capture}
+				<div>
+					<div class="text-xs text-gray-500">
+						{$i18n.t('This is a default user permission and will remain enabled.')}
+					</div>
+				</div>
+			{/if}
+		</div>
+
+        <div class="flex flex-col w-full">
+			<div class="flex w-full justify-between my-1">
+				<div class=" self-center text-xs font-medium">
+					{$i18n.t('Allow Attach Knowledge')}
+				</div>
+				<Switch bind:state={permissions.chat.attach_knowledge} />
+			</div>
+			{#if defaultPermissions?.chat?.attach_knowledge && !permissions.chat.attach_knowledge}
+				<div>
+					<div class="text-xs text-gray-500">
+						{$i18n.t('This is a default user permission and will remain enabled.')}
+					</div>
+				</div>
+			{/if}
+		</div>
+
 		<div class="flex flex-col w-full">
 			<div class="flex w-full justify-between my-1">
 				<div class=" self-center text-xs font-medium">
