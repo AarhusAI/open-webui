@@ -549,6 +549,25 @@
 	};
 
 	const isWindows = /Windows/i.test(navigator.userAgent);
+
+	// PATCH ADD LOGO TO SIDEBAR
+	function IsJson(str) {
+		try {
+			JSON.parse(str);
+		} catch (e) {
+			return false;
+		}
+		return true;
+	}
+
+	function getUrl(str) {
+		if (IsJson(str)) {
+			return JSON.parse(str);
+		} else {
+			return str;
+		}
+	}
+	// /PATCH ADD LOGO TO SIDEBAR
 </script>
 
 <ArchivedChatsModal
@@ -1354,7 +1373,9 @@
 				</Folder>
 			</div>
 
-			<div class="px-1.5 pt-1.5 pb-2 sticky bottom-0 z-10 -mt-3 sidebar">
+            <!-- PATCH ADD LOGO TO SIDEBAR: pb-[50px]-class added -->
+			<div class="px-1.5 pt-1.5 pb-2 sticky bottom-0 z-10 -mt-3 sidebar pb-[50px]">
+                <!-- /PATCH ADD LOGO TO SIDEBAR -->
 				<div
 					class=" sidebar-bg-gradient-to-t bg-linear-to-t from-gray-50 dark:from-gray-950 to-transparent from-50% pointer-events-none absolute inset-0 -z-10 -mt-6"
 				></div>
@@ -1403,6 +1424,21 @@
 				</div>
 			</div>
 		</div>
+		<!-- PATCH ADD LOGO TO SIDEBAR -->
+		<div class="relative">
+			<div
+				class="-mb-2 flex items-center py-2.5 px-4.5 w-full bg-gray-800 absolute left-0 bottom-0 z-20"
+			>
+				<div class="self-center mr-3">
+					<img
+						src={$config?.extended_features?.logo_url}
+						class="max-w-[150px] object-cover"
+						alt=""
+					/>
+				</div>
+			</div>
+		</div>
+		<!-- /PATCH ADD LOGO TO SIDEBAR -->
 	</div>
 
 	{#if !$mobile}
