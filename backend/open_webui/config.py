@@ -653,6 +653,24 @@ OAUTH_AUDIENCE = PersistentConfig(
     os.environ.get("OAUTH_AUDIENCE", ""),
 )
 
+# PATCH AAK group sharing settings
+AAK_OAUTH_ENABLE_FORCE_GROUP_SHARE_SETTING = (
+    os.environ.get("AAK_OAUTH_ENABLE_FORCE_GROUP_SHARE_SETTING", "False").lower() == "true"
+)
+
+group_share_value = os.environ.get("AAK_OAUTH_GROUP_SHARE_SETTING_VALUE", "members").lower()
+if group_share_value == "true":
+    AAK_OAUTH_GROUP_SHARE_SETTING_VALUE = True
+elif group_share_value == "false":
+    AAK_OAUTH_GROUP_SHARE_SETTING_VALUE = False
+else:
+    # Treat any other string as "members"
+    AAK_OAUTH_GROUP_SHARE_SETTING_VALUE = "members"
+# AAK_OAUTH_GROUP_SHARE_SETTING_VALUE should be:
+# False (No one can share to group),
+# "members" (members of group can share to the group)
+# True (anyone can share to group)
+# //PATCH PATCH AAK group sharing settings
 
 def load_oauth_providers():
     OAUTH_PROVIDERS.clear()

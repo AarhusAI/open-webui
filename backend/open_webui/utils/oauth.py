@@ -59,6 +59,8 @@ from open_webui.config import (
     OAUTH_AUDIENCE,
     WEBHOOK_URL,
     JWT_EXPIRES_IN,
+    AAK_OAUTH_ENABLE_FORCE_GROUP_SHARE_SETTING, # Patch Group sharing permissions
+    AAK_OAUTH_GROUP_SHARE_SETTING_VALUE, # Patch Group sharing permissions
     AppConfig,
 )
 from open_webui.constants import ERROR_MESSAGES, WEBHOOK_MESSAGES
@@ -1276,6 +1278,33 @@ class OAuthManager:
             if groups_created:
                 all_available_groups = Groups.get_all_groups(db=db)
                 log.debug("Refreshed list of all available groups after creation.")
+
+        # PATCH AAK group sharing settings
+        if AAK_OAUTH_ENABLE_FORCE_GROUP_SHARE_SETTING:
+            non_member_share_groups = [
+                group for group in all_available_groups
+                if (group.data or {}).get("config", {}).get("share") != AAK_OAUTH_GROUP_SHARE_SETTING_VALUE
+            ]
+
+            for group in non_member_share_groups:
+                current_data = group.data or {}
+
+                if "config" not in current_data:
+                    current_data["config"] = {}
+
+                current_data["config"]["share"] = AAK_OAUTH_GROUP_SHARE_SETTING_VALUE
+
+                Groups.update_group_by_id(
+                    id=group.id,
+                    form_data=GroupUpdateForm(
+                        name=group.name,
+                        description=group.description,
+                        permissions=group.permissions,
+                        data=current_data
+                    ),
+                    db=db,
+                )
+        # //PATCH AAK group sharing settings
 
         log.debug(f"Oauth Groups claim: {oauth_claim}")
         log.debug(f"User oauth groups: {user_oauth_groups}")
