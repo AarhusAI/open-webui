@@ -1101,6 +1101,44 @@
 						</div>
 
 						{#if !RAGConfig.RAG_FULL_CONTEXT}
+							<!-- BEGIN EXTERNAL RETRIEVAL PATCH -->
+							<div class="mb-2.5 flex flex-col w-full justify-between">
+								<div class="flex w-full justify-between">
+									<div class="self-center text-xs font-medium">
+										{$i18n.t('Retrieval Engine')}
+									</div>
+									<div class="flex items-center relative">
+										<select
+											class="w-fit pr-8 rounded-sm px-2 p-1 text-xs bg-transparent outline-hidden text-right"
+											bind:value={RAGConfig.RAG_RETRIEVAL_ENGINE}
+											placeholder={$i18n.t('Select a retrieval engine')}
+										>
+											<option value="">{$i18n.t('Default (Built-in Vector DB)')}</option>
+											<option value="external">{$i18n.t('External')}</option>
+										</select>
+									</div>
+								</div>
+
+								{#if RAGConfig.RAG_RETRIEVAL_ENGINE === 'external'}
+									<div class="my-0.5 flex gap-2 pr-2">
+										<input
+											class="flex-1 w-full text-sm bg-transparent outline-hidden"
+											placeholder={$i18n.t('API Base URL')}
+											bind:value={RAGConfig.RAG_EXTERNAL_RETRIEVAL_URL}
+											required
+										/>
+
+										<SensitiveInput
+											placeholder={$i18n.t('API Key')}
+											bind:value={RAGConfig.RAG_EXTERNAL_RETRIEVAL_API_KEY}
+											required={false}
+										/>
+									</div>
+								{/if}
+							</div>
+							<!-- END EXTERNAL RETRIEVAL PATCH -->
+
+							{#if RAGConfig.RAG_RETRIEVAL_ENGINE !== 'external'}
 							<div class="  mb-2.5 flex w-full justify-between">
 								<div class=" self-center text-xs font-medium">{$i18n.t('Hybrid Search')}</div>
 								<div class="flex items-center relative">
@@ -1183,6 +1221,7 @@
 										</div>
 									</div>
 								</div>
+							{/if}
 							{/if}
 
 							<div class="  mb-2.5 flex w-full justify-between">

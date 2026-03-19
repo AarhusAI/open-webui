@@ -20,6 +20,9 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 
 from open_webui.config import VECTOR_DB
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+from open_webui.retrieval.external import query_external_retrieval
+# --- END EXTERNAL RETRIEVAL PATCH ---
 from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
 
 
@@ -1141,6 +1144,19 @@ async def get_sources_from_items(
             try:
                 if full_context:
                     query_result = get_all_items_from_collections(collection_names)
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                elif request.app.state.config.RAG_RETRIEVAL_ENGINE == "external":
+                    query_result = await asyncio.to_thread(
+                        query_external_retrieval,
+                        url=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
+                        api_key=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+                        queries=queries,
+                        collection_names=list(collection_names),
+                        k=k,
+                        timeout=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+                        user=user,
+                    )
+                # --- END EXTERNAL RETRIEVAL PATCH ---
                 else:
                     query_result = await query_collection(
                         request,

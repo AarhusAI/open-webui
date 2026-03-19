@@ -58,6 +58,12 @@ type RAGConfigForm = {
 	content_extraction?: ContentExtractConfigForm;
 	web_loader_ssl_verification?: boolean;
 	youtube?: YoutubeConfigForm;
+	// --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+	RAG_RETRIEVAL_ENGINE?: string;
+	RAG_EXTERNAL_RETRIEVAL_URL?: string;
+	RAG_EXTERNAL_RETRIEVAL_API_KEY?: string;
+	RAG_EXTERNAL_RETRIEVAL_TIMEOUT?: string;
+	// --- END EXTERNAL RETRIEVAL PATCH ---
 };
 
 export const updateRAGConfig = async (token: string, payload: RAGConfigForm) => {

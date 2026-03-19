@@ -2881,6 +2881,33 @@ RAG_EXTERNAL_RERANKER_TIMEOUT = PersistentConfig(
     os.environ.get('RAG_EXTERNAL_RERANKER_TIMEOUT', ''),
 )
 
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+# External retrieval engine: allows delegating document search to an external HTTP service
+RAG_RETRIEVAL_ENGINE = PersistentConfig(
+    "RAG_RETRIEVAL_ENGINE",
+    "rag.retrieval_engine",
+    os.environ.get("RAG_RETRIEVAL_ENGINE", ""),
+)
+
+RAG_EXTERNAL_RETRIEVAL_URL = PersistentConfig(
+    "RAG_EXTERNAL_RETRIEVAL_URL",
+    "rag.external_retrieval_url",
+    os.environ.get("RAG_EXTERNAL_RETRIEVAL_URL", ""),
+)
+
+RAG_EXTERNAL_RETRIEVAL_API_KEY = PersistentConfig(
+    "RAG_EXTERNAL_RETRIEVAL_API_KEY",
+    "rag.external_retrieval_api_key",
+    os.environ.get("RAG_EXTERNAL_RETRIEVAL_API_KEY", ""),
+)
+
+RAG_EXTERNAL_RETRIEVAL_TIMEOUT = PersistentConfig(
+    "RAG_EXTERNAL_RETRIEVAL_TIMEOUT",
+    "rag.external_retrieval_timeout",
+    os.environ.get("RAG_EXTERNAL_RETRIEVAL_TIMEOUT", ""),
+)
+# --- END EXTERNAL RETRIEVAL PATCH ---
+
 
 RAG_TEXT_SPLITTER = PersistentConfig(
     'RAG_TEXT_SPLITTER',

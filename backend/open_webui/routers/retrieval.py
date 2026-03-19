@@ -489,6 +489,12 @@ async def get_rag_config(request: Request, user=Depends(get_admin_user)):
         'RAG_EXTERNAL_RERANKER_URL': request.app.state.config.RAG_EXTERNAL_RERANKER_URL,
         'RAG_EXTERNAL_RERANKER_API_KEY': request.app.state.config.RAG_EXTERNAL_RERANKER_API_KEY,
         'RAG_EXTERNAL_RERANKER_TIMEOUT': request.app.state.config.RAG_EXTERNAL_RERANKER_TIMEOUT,
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        'RAG_RETRIEVAL_ENGINE': request.app.state.config.RAG_RETRIEVAL_ENGINE,
+        'RAG_EXTERNAL_RETRIEVAL_URL': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
+        'RAG_EXTERNAL_RETRIEVAL_API_KEY': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+        'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+        # --- END EXTERNAL RETRIEVAL PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,
         'ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER': request.app.state.config.ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER,
@@ -696,6 +702,13 @@ class ConfigForm(BaseModel):
     RAG_EXTERNAL_RERANKER_URL: Optional[str] = None
     RAG_EXTERNAL_RERANKER_API_KEY: Optional[str] = None
     RAG_EXTERNAL_RERANKER_TIMEOUT: Optional[str] = None
+
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    RAG_RETRIEVAL_ENGINE: Optional[str] = None
+    RAG_EXTERNAL_RETRIEVAL_URL: Optional[str] = None
+    RAG_EXTERNAL_RETRIEVAL_API_KEY: Optional[str] = None
+    RAG_EXTERNAL_RETRIEVAL_TIMEOUT: Optional[str] = None
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 
     # Chunking settings
     TEXT_SPLITTER: Optional[str] = None
@@ -939,6 +952,32 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         else request.app.state.config.RAG_EXTERNAL_RERANKER_TIMEOUT
     )
 
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    request.app.state.config.RAG_RETRIEVAL_ENGINE = (
+        form_data.RAG_RETRIEVAL_ENGINE
+        if form_data.RAG_RETRIEVAL_ENGINE is not None
+        else request.app.state.config.RAG_RETRIEVAL_ENGINE
+    )
+
+    request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL = (
+        form_data.RAG_EXTERNAL_RETRIEVAL_URL
+        if form_data.RAG_EXTERNAL_RETRIEVAL_URL is not None
+        else request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL
+    )
+
+    request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY = (
+        form_data.RAG_EXTERNAL_RETRIEVAL_API_KEY
+        if form_data.RAG_EXTERNAL_RETRIEVAL_API_KEY is not None
+        else request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY
+    )
+
+    request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT = (
+        form_data.RAG_EXTERNAL_RETRIEVAL_TIMEOUT
+        if form_data.RAG_EXTERNAL_RETRIEVAL_TIMEOUT is not None
+        else request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT
+    )
+    # --- END EXTERNAL RETRIEVAL PATCH ---
+
     log.info(
         f'Updating reranking model: {request.app.state.config.RAG_RERANKING_MODEL} to {form_data.RAG_RERANKING_MODEL}'
     )
@@ -1152,6 +1191,12 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         'RAG_EXTERNAL_RERANKER_URL': request.app.state.config.RAG_EXTERNAL_RERANKER_URL,
         'RAG_EXTERNAL_RERANKER_API_KEY': request.app.state.config.RAG_EXTERNAL_RERANKER_API_KEY,
         'RAG_EXTERNAL_RERANKER_TIMEOUT': request.app.state.config.RAG_EXTERNAL_RERANKER_TIMEOUT,
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        'RAG_RETRIEVAL_ENGINE': request.app.state.config.RAG_RETRIEVAL_ENGINE,
+        'RAG_EXTERNAL_RETRIEVAL_URL': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
+        'RAG_EXTERNAL_RETRIEVAL_API_KEY': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+        'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+        # --- END EXTERNAL RETRIEVAL PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,
         'CHUNK_SIZE': request.app.state.config.CHUNK_SIZE,
