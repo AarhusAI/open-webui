@@ -19,6 +19,9 @@
 
 	import { reindexKnowledgeFiles, reindexKnowledgeMetadata } from '$lib/apis/knowledge';
 	import { reindexMemoryVectors } from '$lib/apis/memories';
+
+	import { getTaskConfig, updateTaskConfig } from '$lib/apis';
+
 	import { deleteAllFiles } from '$lib/apis/files';
 
 	import ResetUploadDirConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
@@ -71,6 +74,8 @@
 	};
 
 	let RAGConfig: any = null;
+	let retrievalQueryPrompt: any = '';
+
 	const inputClass =
 		'w-full h-7 rounded-lg border border-gray-100/50 bg-gray-50/40 px-2 text-xs text-gray-700 outline-hidden transition-colors placeholder:text-gray-300 focus:border-blue-400 dark:border-white/[0.04] dark:bg-white/[0.03] dark:text-gray-300 dark:placeholder:text-gray-700 dark:focus:border-blue-500';
 	const actionButtonClass =
@@ -260,6 +265,15 @@
 			}
 		}
 
+		// Save the retrieval query prompt via the task config API
+		const currentTaskConfig = await getTaskConfig(localStorage.token);
+		if (currentTaskConfig) {
+			await updateTaskConfig(localStorage.token, {
+				...currentTaskConfig,
+				RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE: retrievalQueryPrompt
+			});
+		}
+
 		const res = await updateRAGConfig(localStorage.token, {
 			...RAGConfig,
 			// Convert null (from cleared number inputs) to empty string so the backend
@@ -347,6 +361,11 @@
 		config.RAG_TOKENIZER_MODEL = config?.RAG_TOKENIZER_MODEL ?? '';
 
 		RAGConfig = config;
+
+		const taskConfig = await getTaskConfig(localStorage.token);
+		if (taskConfig) {
+			retrievalQueryPrompt = taskConfig.RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE ?? '';
+		}
 	});
 </script>
 
@@ -1408,6 +1427,25 @@
 						{/if}
 					{/if}
 				{/if}
+
+				<AdminSettingField
+					label={$i18n.t('Retrieval Query Generation Prompt')}
+					description={$i18n.t('Prompt template used when search query retrieved context is injected.')}
+				>
+					<Tooltip
+						content={$i18n.t('Leave empty to use the default prompt, or enter a custom prompt')}
+						placement="top-start"
+						className="w-full"
+					>
+						<Textarea
+							className={textareaClass}
+							bind:value={retrievalQueryPrompt}
+							placeholder={$i18n.t(
+								'Leave empty to use the default prompt, or enter a custom prompt'
+							)}
+						/>
+					</Tooltip>
+				</AdminSettingField>
 
 				<AdminSettingField
 					label={$i18n.t('RAG Template')}

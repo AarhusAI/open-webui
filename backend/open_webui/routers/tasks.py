@@ -11,6 +11,7 @@ from open_webui.config import (
     DEFAULT_IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_MOA_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_QUERY_GENERATION_PROMPT_TEMPLATE,
+    DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_TAGS_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_TITLE_GENERATION_PROMPT_TEMPLATE,
     DEFAULT_VOICE_MODE_PROMPT_TEMPLATE,
@@ -55,6 +56,7 @@ TASK_CONFIG_KEYS = {
     'ENABLE_SEARCH_QUERY_GENERATION': 'task.query.search.enable',
     'ENABLE_RETRIEVAL_QUERY_GENERATION': 'task.query.retrieval.enable',
     'QUERY_GENERATION_PROMPT_TEMPLATE': 'task.query.prompt_template',
+    'RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE': 'task.query.retrieval_prompt_template',
     'TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE': 'task.tools.prompt_template',
     'ENABLE_VOICE_MODE_PROMPT': 'task.voice.prompt.enable',
     'VOICE_MODE_PROMPT_TEMPLATE': 'task.voice.prompt_template',
@@ -127,6 +129,7 @@ class TaskConfigForm(BaseModel):
     ENABLE_SEARCH_QUERY_GENERATION: bool
     ENABLE_RETRIEVAL_QUERY_GENERATION: bool
     QUERY_GENERATION_PROMPT_TEMPLATE: str
+    RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE: str
     TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE: str
     ENABLE_VOICE_MODE_PROMPT: bool
     VOICE_MODE_PROMPT_TEMPLATE: Optional[str]
@@ -439,11 +442,18 @@ async def generate_queries(request: Request, form_data: dict, user=Depends(get_v
 
     log.debug('generating %s queries using model %s for user %s', type, task_model_id, user.email)
 
-    query_template = await Config.get('task.query.prompt_template')
-    if query_template.strip() != '':
-        template = query_template
+    if type == 'retrieval':
+        retrieval_query_template = await Config.get('task.query.retrieval_prompt_template')
+        if retrieval_query_template.strip() != '':
+            template = retrieval_query_template
+        else:
+            template = DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
     else:
-        template = DEFAULT_QUERY_GENERATION_PROMPT_TEMPLATE
+        query_template = await Config.get('task.query.prompt_template')
+        if query_template.strip() != '':
+            template = query_template
+        else:
+            template = DEFAULT_QUERY_GENERATION_PROMPT_TEMPLATE
 
     content = await query_generation_template(template, form_data['messages'], user)
 
