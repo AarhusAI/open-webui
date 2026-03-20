@@ -2906,6 +2906,24 @@ RAG_EXTERNAL_RETRIEVAL_TIMEOUT = PersistentConfig(
     "rag.external_retrieval_timeout",
     os.environ.get("RAG_EXTERNAL_RETRIEVAL_TIMEOUT", ""),
 )
+
+RAG_EXTERNAL_BYPASS_QUERY_GENERATION = PersistentConfig(
+    "RAG_EXTERNAL_BYPASS_QUERY_GENERATION",
+    "rag.external_bypass_query_generation",
+    os.environ.get("RAG_EXTERNAL_BYPASS_QUERY_GENERATION", "false").lower() == "true",
+)
+
+RAG_EXTERNAL_MESSAGE_COUNT = PersistentConfig(
+    "RAG_EXTERNAL_MESSAGE_COUNT",
+    "rag.external_message_count",
+    int(os.environ.get("RAG_EXTERNAL_MESSAGE_COUNT", "10")),
+)
+
+RAG_EXTERNAL_USER_MESSAGES_ONLY = PersistentConfig(
+    "RAG_EXTERNAL_USER_MESSAGES_ONLY",
+    "rag.external_user_messages_only",
+    os.environ.get("RAG_EXTERNAL_USER_MESSAGES_ONLY", "false").lower() == "true",
+)
 # --- END EXTERNAL RETRIEVAL PATCH ---
 
 

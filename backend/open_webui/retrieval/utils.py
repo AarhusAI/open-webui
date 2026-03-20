@@ -939,6 +939,9 @@ async def get_sources_from_items(
     hybrid_search,
     full_context=False,
     user: Optional[UserModel] = None,
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    messages: Optional[list] = None,
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 ):
     log.debug(f'items: {items} {queries} {embedding_function} {reranking_function} {full_context}')
 
@@ -1155,6 +1158,7 @@ async def get_sources_from_items(
                         k=k,
                         timeout=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
                         user=user,
+                        messages=messages,
                     )
                 # --- END EXTERNAL RETRIEVAL PATCH ---
                 else:

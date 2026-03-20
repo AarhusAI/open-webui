@@ -494,6 +494,9 @@ async def get_rag_config(request: Request, user=Depends(get_admin_user)):
         'RAG_EXTERNAL_RETRIEVAL_URL': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
         'RAG_EXTERNAL_RETRIEVAL_API_KEY': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
         'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+        'RAG_EXTERNAL_BYPASS_QUERY_GENERATION': request.app.state.config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION,
+        'RAG_EXTERNAL_MESSAGE_COUNT': request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT,
+        'RAG_EXTERNAL_USER_MESSAGES_ONLY': request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY,
         # --- END EXTERNAL RETRIEVAL PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,
@@ -708,6 +711,9 @@ class ConfigForm(BaseModel):
     RAG_EXTERNAL_RETRIEVAL_URL: Optional[str] = None
     RAG_EXTERNAL_RETRIEVAL_API_KEY: Optional[str] = None
     RAG_EXTERNAL_RETRIEVAL_TIMEOUT: Optional[str] = None
+    RAG_EXTERNAL_BYPASS_QUERY_GENERATION: Optional[bool] = None
+    RAG_EXTERNAL_MESSAGE_COUNT: Optional[int] = None
+    RAG_EXTERNAL_USER_MESSAGES_ONLY: Optional[bool] = None
     # --- END EXTERNAL RETRIEVAL PATCH ---
 
     # Chunking settings
@@ -976,6 +982,24 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         if form_data.RAG_EXTERNAL_RETRIEVAL_TIMEOUT is not None
         else request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT
     )
+
+    request.app.state.config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION = (
+        form_data.RAG_EXTERNAL_BYPASS_QUERY_GENERATION
+        if form_data.RAG_EXTERNAL_BYPASS_QUERY_GENERATION is not None
+        else request.app.state.config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION
+    )
+
+    request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT = (
+        form_data.RAG_EXTERNAL_MESSAGE_COUNT
+        if form_data.RAG_EXTERNAL_MESSAGE_COUNT is not None
+        else request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT
+    )
+
+    request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY = (
+        form_data.RAG_EXTERNAL_USER_MESSAGES_ONLY
+        if form_data.RAG_EXTERNAL_USER_MESSAGES_ONLY is not None
+        else request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY
+    )
     # --- END EXTERNAL RETRIEVAL PATCH ---
 
     log.info(
@@ -1196,6 +1220,9 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         'RAG_EXTERNAL_RETRIEVAL_URL': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
         'RAG_EXTERNAL_RETRIEVAL_API_KEY': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
         'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+        'RAG_EXTERNAL_BYPASS_QUERY_GENERATION': request.app.state.config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION,
+        'RAG_EXTERNAL_MESSAGE_COUNT': request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT,
+        'RAG_EXTERNAL_USER_MESSAGES_ONLY': request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY,
         # --- END EXTERNAL RETRIEVAL PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,

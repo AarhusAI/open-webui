@@ -22,11 +22,13 @@ def query_external_retrieval(
     k: int,
     timeout: Optional[str] = None,
     user=None,
+    messages: Optional[List[dict]] = None,
 ) -> Optional[dict]:
     """
     Query an external retrieval service.
 
     POST {url}/search with queries + collection_names + k.
+    Optionally includes messages for external services that support message passthrough.
     Returns dict with keys: documents, metadatas, distances (matching internal format).
     Returns None on error.
     """
@@ -35,6 +37,9 @@ def query_external_retrieval(
         "collection_names": collection_names,
         "k": k,
     }
+
+    if messages is not None:
+        payload["messages"] = messages
 
     try:
         headers = {
@@ -49,6 +54,7 @@ def query_external_retrieval(
 
         log.info(
             f"query_external_retrieval: url={url}, queries={queries}, "
+            f"messages={len(messages) if messages else 0}, "
             f"collections={collection_names}, k={k}"
         )
 
