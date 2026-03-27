@@ -1149,6 +1149,16 @@ async def get_sources_from_items(
                     query_result = get_all_items_from_collections(collection_names)
                 # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
                 elif request.app.state.config.RAG_RETRIEVAL_ENGINE == "external":
+                    # Resolve the effective query generation template
+                    _template = (
+                        request.app.state.config.RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
+                    )
+                    if not (_template and _template.strip()):
+                        from open_webui.config import (
+                            DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE,
+                        )
+                        _template = DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
+
                     query_result = await asyncio.to_thread(
                         query_external_retrieval,
                         url=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
@@ -1159,6 +1169,7 @@ async def get_sources_from_items(
                         timeout=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
                         user=user,
                         messages=messages,
+                        retrieval_query_generation_prompt_template=_template,
                     )
                 # --- END EXTERNAL RETRIEVAL PATCH ---
                 else:
