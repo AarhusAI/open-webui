@@ -7,7 +7,32 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+<<<<<<< HEAD
 from fastapi.responses import FileResponse, Response, StreamingResponse
+=======
+from fastapi.responses import Response, StreamingResponse, FileResponse
+from pydantic import BaseModel, ConfigDict
+
+
+from open_webui.models.auths import ApiKey, Auths
+from open_webui.models.oauth_sessions import OAuthSessions
+
+from open_webui.models.groups import Groups
+
+from open_webui.models.users import (
+    UserModel,
+    UserGroupIdsModel,
+    UserGroupIdsListResponse,
+    UserInfoResponse,
+    UserInfoListResponse,
+    UserRoleUpdateForm,
+    UserStatus,
+    Users,
+    UserSettings,
+    UserUpdateForm,
+)
+
+>>>>>>> 848b900bd (Added support for admins to add api-keys to users)
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import ENABLE_PROFILE_IMAGE_URL_FORWARDING, PROFILE_IMAGE_ALLOWED_MIME_TYPES, STATIC_DIR
 from open_webui.internal.db import get_async_session
@@ -33,6 +58,7 @@ from open_webui.models.tools import Tools
 from open_webui.socket.main import disconnect_user_sessions
 from open_webui.utils.access_control import get_permissions, has_permission
 from open_webui.utils.auth import (
+    create_api_key,
     get_admin_user,
     get_password_hash,
     get_verified_user,
@@ -759,3 +785,57 @@ async def get_user_preview(
             'total': len(all_tools),
         },
     }
+
+
+############################
+# Admin: User API Key Management
+############################
+
+@router.post("/{user_id}/api_key", response_model=ApiKey)
+async def generate_api_key_for_user(
+    user_id: str,
+    user=Depends(get_admin_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    target_user = await Users.get_user_by_id(user_id, db=db)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.USER_NOT_FOUND,
+        )
+
+    api_key = create_api_key()
+    success = await Users.update_user_api_key_by_id(user_id, api_key, db=db)
+
+    if success:
+        return {"api_key": api_key}
+    else:
+        raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_API_KEY_ERROR)
+
+
+@router.get("/{user_id}/api_key", response_model=ApiKey)
+async def get_api_key_for_user(
+    user_id: str,
+    user=Depends(get_admin_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    api_key = await Users.get_user_api_key_by_id(user_id, db=db)
+    if api_key:
+        return {"api_key": api_key}
+    else:
+        raise HTTPException(404, detail=ERROR_MESSAGES.API_KEY_NOT_FOUND)
+
+
+@router.delete("/{user_id}/api_key", response_model=bool)
+async def delete_api_key_for_user(
+    user_id: str,
+    user=Depends(get_admin_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    target_user = await Users.get_user_by_id(user_id, db=db)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.USER_NOT_FOUND,
+        )
+    return await Users.delete_user_api_key_by_id(user_id, db=db)
