@@ -411,6 +411,14 @@ def get_citation_source_from_tool_result(
         if isinstance(tool_result, dict) and 'error' in tool_result:
             return []
 
+        # Unwrap {'results': [...]} wrapper added by process_tool_result for MCP tools
+        if (
+            isinstance(tool_result, dict)
+            and 'results' in tool_result
+            and isinstance(tool_result['results'], list)
+        ):
+            tool_result = tool_result['results']
+
         # Validate tool_result type based on what the branch expects
         if tool_name in _EXPECTS_LIST and not isinstance(tool_result, list):
             return []
@@ -1453,24 +1461,43 @@ async def chat_completion_tools_handler(
                     tool = tools[tool_function_name]
                     tool_id = tool.get('tool_id', '')
 
-                    tool_name = f'{tool_id}/{tool_function_name}' if tool_id else f'{tool_function_name}'
+                    # Use original (un-prefixed) name for MCP tools so that
+                    # e.g. "websearch_search_web" matches the "search_web" handler.
+                    citation_tool_name = tool.get('original_name', tool_function_name)
 
-                    # Citation is enabled for this tool
-                    sources.append(
-                        {
-                            'source': {
-                                'name': (f'{tool_name}'),
-                            },
-                            'document': [str(tool_result)],
-                            'metadata': [
-                                {
-                                    'source': (f'{tool_name}'),
-                                    'parameters': tool_function_params,
-                                }
-                            ],
-                            'tool_result': True,
-                        }
-                    )
+                    if citation_tool_name in [
+                        'search_web',
+                        'fetch_url',
+                        'view_file',
+                        'view_knowledge_file',
+                        'query_knowledge_files',
+                    ]:
+                        try:
+                            citation_sources = get_citation_source_from_tool_result(
+                                tool_name=citation_tool_name,
+                                tool_params=tool_function_params,
+                                tool_result=tool_result,
+                                tool_id=tool_id,
+                            )
+                            sources.extend(citation_sources)
+                        except Exception as e:
+                            log.exception(f'Error extracting citation source: {e}')
+                    else:
+                        tool_name = f'{tool_id}/{tool_function_name}' if tool_id else f'{tool_function_name}'
+                        sources.append(
+                            {
+                                'source': {
+                                    'name': (f'{tool_name}'),
+                                },
+                                'document': [str(tool_result)],
+                                'metadata': [
+                                    {
+                                        'source': (f'{tool_name}'),
+                                        'parameters': tool_function_params,
+                                    }
+                                ],
+                            }
+                        )
 
                     if tools[tool_function_name].get('metadata', {}).get('file_handler', False):
                         skip_files = True
@@ -2898,6 +2925,7 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                                 'type': 'mcp',
                                 'client': client,
                                 'direct': False,
+                                'original_name': tool_spec['name'],
                             }
                     except Exception as e:
                         log.debug(e)
@@ -5768,9 +5796,16 @@ async def streaming_chat_response_handler(response, ctx):
                         )
 
                         # Extract citation sources from tool results
+                        # Use original (un-prefixed) name for MCP tools so that
+                        # e.g. "websearch_search_web" matches the "search_web" handler.
+                        citation_tool_name = (
+                            tool.get('original_name', tool_function_name)
+                            if tool
+                            else tool_function_name
+                        )
                         if (
                             citations_enabled
-                            and tool_function_name
+                            and citation_tool_name
                             in [
                                 'search_web',
                                 'fetch_url',
@@ -5783,7 +5818,7 @@ async def streaming_chat_response_handler(response, ctx):
                         ):
                             try:
                                 citation_sources = get_citation_source_from_tool_result(
-                                    tool_name=tool_function_name,
+                                    tool_name=citation_tool_name,
                                     tool_params=tool_function_params,
                                     tool_result=tool_result,
                                     tool_id=tool.get('tool_id', '') if tool else '',
