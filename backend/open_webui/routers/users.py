@@ -7,36 +7,11 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-<<<<<<< HEAD
 from fastapi.responses import FileResponse, Response, StreamingResponse
-=======
-from fastapi.responses import Response, StreamingResponse, FileResponse
-from pydantic import BaseModel, ConfigDict
-
-
-from open_webui.models.auths import ApiKey, Auths
-from open_webui.models.oauth_sessions import OAuthSessions
-
-from open_webui.models.groups import Groups
-
-from open_webui.models.users import (
-    UserModel,
-    UserGroupIdsModel,
-    UserGroupIdsListResponse,
-    UserInfoResponse,
-    UserInfoListResponse,
-    UserRoleUpdateForm,
-    UserStatus,
-    Users,
-    UserSettings,
-    UserUpdateForm,
-)
-
->>>>>>> 848b900bd (Added support for admins to add api-keys to users)
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import ENABLE_PROFILE_IMAGE_URL_FORWARDING, PROFILE_IMAGE_ALLOWED_MIME_TYPES, STATIC_DIR
 from open_webui.internal.db import get_async_session
-from open_webui.models.auths import Auths
+from open_webui.models.auths import ApiKey, Auths
 from open_webui.models.groups import Groups
 from open_webui.models.oauth_sessions import OAuthSessions
 from open_webui.models.users import (

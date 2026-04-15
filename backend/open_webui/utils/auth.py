@@ -409,14 +409,7 @@ async def get_current_user_by_api_key(request, api_key: str):
             detail=ERROR_MESSAGES.INVALID_TOKEN,
         )
 
-    if not request.state.enable_api_keys or (
-        user.role != 'admin'
-        and not await has_permission(
-            user.id,
-            'features.api_keys',
-            request.app.state.config.USER_PERMISSIONS,
-        )
-    ):
+    if not request.state.enable_api_keys:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.API_KEY_NOT_ALLOWED)
 
     # Enforce endpoint restrictions — checked here (not in middleware)
