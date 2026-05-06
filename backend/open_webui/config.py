@@ -1382,6 +1382,82 @@ RAG_EXTERNAL_RERANKER_TIMEOUT = ConfigVar(
 )
 
 
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+# External retrieval engine: allows delegating document search to an external HTTP service
+RAG_RETRIEVAL_ENGINE = PersistentConfig(
+    "RAG_RETRIEVAL_ENGINE",
+    "rag.retrieval_engine",
+    os.environ.get("RAG_RETRIEVAL_ENGINE", ""),
+)
+
+RAG_EXTERNAL_RETRIEVAL_URL = PersistentConfig(
+    "RAG_EXTERNAL_RETRIEVAL_URL",
+    "rag.external_retrieval_url",
+    os.environ.get("RAG_EXTERNAL_RETRIEVAL_URL", ""),
+)
+
+RAG_EXTERNAL_RETRIEVAL_API_KEY = PersistentConfig(
+    "RAG_EXTERNAL_RETRIEVAL_API_KEY",
+    "rag.external_retrieval_api_key",
+    os.environ.get("RAG_EXTERNAL_RETRIEVAL_API_KEY", ""),
+)
+
+RAG_EXTERNAL_RETRIEVAL_TIMEOUT = PersistentConfig(
+    "RAG_EXTERNAL_RETRIEVAL_TIMEOUT",
+    "rag.external_retrieval_timeout",
+    os.environ.get("RAG_EXTERNAL_RETRIEVAL_TIMEOUT", ""),
+)
+
+RAG_EXTERNAL_BYPASS_QUERY_GENERATION = PersistentConfig(
+    "RAG_EXTERNAL_BYPASS_QUERY_GENERATION",
+    "rag.external_bypass_query_generation",
+    os.environ.get("RAG_EXTERNAL_BYPASS_QUERY_GENERATION", "false").lower() == "true",
+)
+
+RAG_EXTERNAL_MESSAGE_COUNT = PersistentConfig(
+    "RAG_EXTERNAL_MESSAGE_COUNT",
+    "rag.external_message_count",
+    int(os.environ.get("RAG_EXTERNAL_MESSAGE_COUNT", "10")),
+)
+
+RAG_EXTERNAL_USER_MESSAGES_ONLY = PersistentConfig(
+    "RAG_EXTERNAL_USER_MESSAGES_ONLY",
+    "rag.external_user_messages_only",
+    os.environ.get("RAG_EXTERNAL_USER_MESSAGES_ONLY", "false").lower() == "true",
+)
+# --- END EXTERNAL RETRIEVAL PATCH ---
+
+
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+# External ingestion engine: delegates document chunking, embedding, and vector
+# storage to an external HTTP service instead of running save_docs_to_vector_db
+# in-process. Default off; set EXTERNAL_INGESTION_ENGINE=external to enable.
+EXTERNAL_INGESTION_ENGINE = PersistentConfig(
+    "EXTERNAL_INGESTION_ENGINE",
+    "rag.external_ingestion_engine",
+    os.environ.get("EXTERNAL_INGESTION_ENGINE", ""),
+)
+
+EXTERNAL_INGESTION_URL = PersistentConfig(
+    "EXTERNAL_INGESTION_URL",
+    "rag.external_ingestion_url",
+    os.environ.get("EXTERNAL_INGESTION_URL", ""),
+)
+
+EXTERNAL_INGESTION_API_KEY = PersistentConfig(
+    "EXTERNAL_INGESTION_API_KEY",
+    "rag.external_ingestion_api_key",
+    os.environ.get("EXTERNAL_INGESTION_API_KEY", ""),
+)
+
+EXTERNAL_INGESTION_TIMEOUT = PersistentConfig(
+    "EXTERNAL_INGESTION_TIMEOUT",
+    "rag.external_ingestion_timeout",
+    os.environ.get("EXTERNAL_INGESTION_TIMEOUT", "300"),
+)
+# --- END EXTERNAL INGESTION PATCH ---
+
+
 RAG_TEXT_SPLITTER = ConfigVar(
     'RAG_TEXT_SPLITTER',
     'rag.text_splitter',

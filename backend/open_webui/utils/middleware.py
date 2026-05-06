@@ -1965,46 +1965,67 @@ async def chat_completion_files_handler(
         all_full_context = all(item.get('context') == 'full' for item in files)
 
         queries = []
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        messages_for_external = None
+        # --- END EXTERNAL RETRIEVAL PATCH ---
         if not all_full_context:
-            try:
-                queries_response = await generate_queries(
-                    request,
-                    {
-                        'model': body['model'],
-                        'messages': body['messages'],
-                        'type': 'retrieval',
-                        'chat_id': body.get('metadata', {}).get('chat_id'),
-                    },
-                    user,
-                )
-                queries_response = queries_response['choices'][0]['message']['content']
-
+            # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+            if (
+                request.app.state.config.RAG_RETRIEVAL_ENGINE == 'external'
+                and request.app.state.config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION
+            ):
+                # Skip LLM query generation — send raw messages to external service
+                msg_count = request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT
+                user_only = request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY
+                candidate_messages = body['messages']
+                if user_only:
+                    candidate_messages = [m for m in candidate_messages if m.get('role') == 'user']
+                messages_for_external = [
+                    {'role': m.get('role', ''), 'content': m.get('content', '')}
+                    for m in candidate_messages[-msg_count:]
+                ]
+                # queries stays empty -> falls through to fallback below
+            # --- END EXTERNAL RETRIEVAL PATCH ---
+            else:
                 try:
-                    bracket_start = queries_response.rfind('{')
-                    bracket_end = queries_response.rfind('}') + 1
+                    queries_response = await generate_queries(
+                        request,
+                        {
+                            'model': body['model'],
+                            'messages': body['messages'],
+                            'type': 'retrieval',
+                            'chat_id': body.get('metadata', {}).get('chat_id'),
+                        },
+                        user,
+                    )
+                    queries_response = queries_response['choices'][0]['message']['content']
 
-                    if bracket_start == -1 or bracket_end == -1:
-                        raise Exception('No JSON object found in the response')
+                    try:
+                        bracket_start = queries_response.find('{')
+                        bracket_end = queries_response.rfind('}') + 1
 
-                    queries_response = queries_response[bracket_start:bracket_end]
-                    queries_response = json.loads(queries_response)
-                except Exception as e:
-                    queries_response = {'queries': [queries_response]}
+                        if bracket_start == -1 or bracket_end == -1:
+                            raise Exception('No JSON object found in the response')
 
-                queries = queries_response.get('queries', [])
-            except Exception:
-                pass
+                        queries_response = queries_response[bracket_start:bracket_end]
+                        queries_response = json.loads(queries_response)
+                    except Exception as e:
+                        queries_response = {'queries': [queries_response]}
 
-            await __event_emitter__(
-                {
-                    'type': 'status',
-                    'data': {
-                        'action': 'queries_generated',
-                        'queries': queries,
-                        'done': False,
-                    },
-                }
-            )
+                    queries = queries_response.get('queries', [])
+                except:
+                    pass
+
+                await __event_emitter__(
+                    {
+                        'type': 'status',
+                        'data': {
+                            'action': 'queries_generated',
+                            'queries': queries,
+                            'done': False,
+                        },
+                    }
+                )
 
         if len(queries) == 0:
             queries = [get_last_user_message(body['messages']) or '']
@@ -2030,6 +2051,9 @@ async def chat_completion_files_handler(
                 hybrid_search=request.app.state.config.ENABLE_RAG_HYBRID_SEARCH,
                 full_context=all_full_context or request.app.state.config.RAG_FULL_CONTEXT,
                 user=user,
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                messages=messages_for_external,
+                # --- END EXTERNAL RETRIEVAL PATCH ---
             )
         except Exception as e:
             log.exception(e)

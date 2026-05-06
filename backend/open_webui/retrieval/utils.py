@@ -19,6 +19,11 @@ from langchain_classic.retrievers import (
 )
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
+
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+from open_webui.retrieval.external import query_external_retrieval
+# --- END EXTERNAL RETRIEVAL PATCH ---
+
 from open_webui.config import (
     RAG_EMBEDDING_CONTENT_PREFIX,
     RAG_EMBEDDING_PREFIX_FIELD_NAME,
@@ -1162,6 +1167,9 @@ async def get_sources_from_items(
     hybrid_search,
     full_context=False,
     user: UserModel | None = None,
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    messages: Optional[list] = None,
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 ):
     log.debug(f'items: {items} {queries} {embedding_function} {reranking_function} {full_context}')
 
@@ -1410,6 +1418,31 @@ async def get_sources_from_items(
                     # Sync helper makes blocking VECTOR_DB_CLIENT calls;
                     # offload so the async caller's event loop stays free.
                     query_result = await asyncio.to_thread(get_all_items_from_collections, collection_names)
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                elif request.app.state.config.RAG_RETRIEVAL_ENGINE == "external":
+                    # Resolve the effective query generation template
+                    _template = (
+                        request.app.state.config.RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
+                    )
+                    if not (_template and _template.strip()):
+                        from open_webui.config import (
+                            DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE,
+                        )
+                        _template = DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
+
+                    query_result = await asyncio.to_thread(
+                        query_external_retrieval,
+                        url=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_URL,
+                        api_key=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+                        queries=queries,
+                        collection_names=list(collection_names),
+                        k=k,
+                        timeout=request.app.state.config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+                        user=user,
+                        messages=messages,
+                        retrieval_query_generation_prompt_template=_template,
+                    )
+                # --- END EXTERNAL RETRIEVAL PATCH ---
                 else:
                     query_result = await query_collection(
                         request,
