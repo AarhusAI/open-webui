@@ -33,6 +33,11 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     TokenTextSplitter,
 )
+
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+from open_webui.retrieval.external import process_file_external_ingestion
+# --- END EXTERNAL INGESTION PATCH ---
+
 from open_webui.config import (
     DEFAULT_LOCALE,
     ENV,
@@ -1781,25 +1786,72 @@ async def process_file(
                     await db.commit()
 
                     # External embedding API takes time (5-60s+).
-                    # Subsequent updates use fresh async sessions.
-                    # NOTE: save_docs_to_vector_db is a sync function that
-                    # calls asyncio.run_coroutine_threadsafe(..., main_loop).result()
-                    # which blocks the calling thread.  We MUST run it in a
-                    # worker thread to avoid deadlocking the event loop.
-                    result = await run_in_threadpool(
-                        save_docs_to_vector_db,
-                        request,
-                        docs=docs,
-                        collection_name=collection_name,
-                        metadata={
-                            'file_id': file.id,
-                            'name': file.filename,
-                            'hash': hash,
-                        },
-                        add=(True if form_data.collection_name else False),
-                        user=user,
+
+                    # --- BEGIN EXTERNAL INGESTION PATCH ---
+                    # When EXTERNAL_INGESTION_ENGINE == "external", delegate
+                    # chunk + embed + vector-store to the external ingestion
+                    # service. Limited to the fresh-file path; pre-extracted
+                    # content (form_data.content) and knowledge-base re-add
+                    # (form_data.collection_name) keep the in-process pipeline.
+                    _use_external_ingest = (
+                        request.app.state.config.EXTERNAL_INGESTION_ENGINE == 'external'
+                        and not form_data.content
+                        and not form_data.collection_name
+                        and bool(file.path)
                     )
-                    log.info(f'added {len(docs)} items to collection {collection_name}')
+
+                    if _use_external_ingest:
+                        _s3_bucket, _s3_key = None, None
+                        if file.path.startswith('s3://'):
+                            _without_scheme = file.path[len('s3://'):]
+                            if '/' in _without_scheme:
+                                _s3_bucket, _s3_key = _without_scheme.split('/', 1)
+
+                        _timeout_str = request.app.state.config.EXTERNAL_INGESTION_TIMEOUT
+                        _timeout = int(_timeout_str) if _timeout_str else 300
+
+                        _ingest_result = process_file_external_ingestion(
+                            url=request.app.state.config.EXTERNAL_INGESTION_URL,
+                            api_key=request.app.state.config.EXTERNAL_INGESTION_API_KEY,
+                            file_id=file.id,
+                            filename=file.filename,
+                            collection_name=collection_name,
+                            user_id=file.user_id,
+                            local_file_path=file_path,
+                            s3_bucket=_s3_bucket,
+                            s3_key=_s3_key,
+                            timeout=_timeout,
+                        )
+
+                        result = bool(_ingest_result and _ingest_result.get('status'))
+                        if not result:
+                            _err = (_ingest_result or {}).get('error') or 'External ingestion failed'
+                            raise Exception(_err)
+                        log.info(
+                            f"external ingestion completed for file {file.id}: "
+                            f"chunks={(_ingest_result or {}).get('chunks_count')}"
+                        )
+                    else:
+                        # Subsequent updates use fresh async sessions.
+                        # NOTE: save_docs_to_vector_db is a sync function that
+                        # calls asyncio.run_coroutine_threadsafe(..., main_loop).result()
+                        # which blocks the calling thread.  We MUST run it in a
+                        # worker thread to avoid deadlocking the event loop.
+                        result = await run_in_threadpool(
+                            save_docs_to_vector_db,
+                            request,
+                            docs=docs,
+                            collection_name=collection_name,
+                            metadata={
+                                'file_id': file.id,
+                                'name': file.filename,
+                                'hash': hash,
+                            },
+                            add=(True if form_data.collection_name else False),
+                            user=user,
+                        )
+                        log.info(f'added {len(docs)} items to collection {collection_name}')
+                    # --- END EXTERNAL INGESTION PATCH ---
 
                     if result:
                         # Fresh session for the final update.
