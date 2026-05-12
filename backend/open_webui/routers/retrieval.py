@@ -488,6 +488,12 @@ async def get_rag_config(request: Request, user=Depends(get_admin_user)):
         'RAG_EXTERNAL_MESSAGE_COUNT': request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT,
         'RAG_EXTERNAL_USER_MESSAGES_ONLY': request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY,
         # --- END EXTERNAL RETRIEVAL PATCH ---
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        'EXTERNAL_INGESTION_ENGINE': request.app.state.config.EXTERNAL_INGESTION_ENGINE,
+        'EXTERNAL_INGESTION_URL': request.app.state.config.EXTERNAL_INGESTION_URL,
+        'EXTERNAL_INGESTION_API_KEY': request.app.state.config.EXTERNAL_INGESTION_API_KEY,
+        'EXTERNAL_INGESTION_TIMEOUT': request.app.state.config.EXTERNAL_INGESTION_TIMEOUT,
+        # --- END EXTERNAL INGESTION PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,
         'ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER': request.app.state.config.ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER,
@@ -715,6 +721,13 @@ class ConfigForm(BaseModel):
     RAG_EXTERNAL_MESSAGE_COUNT: Optional[int] = None
     RAG_EXTERNAL_USER_MESSAGES_ONLY: Optional[bool] = None
     # --- END EXTERNAL RETRIEVAL PATCH ---
+
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    EXTERNAL_INGESTION_ENGINE: Optional[str] = None
+    EXTERNAL_INGESTION_URL: Optional[str] = None
+    EXTERNAL_INGESTION_API_KEY: Optional[str] = None
+    EXTERNAL_INGESTION_TIMEOUT: Optional[str] = None
+    # --- END EXTERNAL INGESTION PATCH ---
 
     # Chunking settings
     TEXT_SPLITTER: str | None = None
@@ -1023,6 +1036,32 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
     )
     # --- END EXTERNAL RETRIEVAL PATCH ---
 
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    request.app.state.config.EXTERNAL_INGESTION_ENGINE = (
+        form_data.EXTERNAL_INGESTION_ENGINE
+        if form_data.EXTERNAL_INGESTION_ENGINE is not None
+        else request.app.state.config.EXTERNAL_INGESTION_ENGINE
+    )
+
+    request.app.state.config.EXTERNAL_INGESTION_URL = (
+        form_data.EXTERNAL_INGESTION_URL
+        if form_data.EXTERNAL_INGESTION_URL is not None
+        else request.app.state.config.EXTERNAL_INGESTION_URL
+    )
+
+    request.app.state.config.EXTERNAL_INGESTION_API_KEY = (
+        form_data.EXTERNAL_INGESTION_API_KEY
+        if form_data.EXTERNAL_INGESTION_API_KEY is not None
+        else request.app.state.config.EXTERNAL_INGESTION_API_KEY
+    )
+
+    request.app.state.config.EXTERNAL_INGESTION_TIMEOUT = (
+        form_data.EXTERNAL_INGESTION_TIMEOUT
+        if form_data.EXTERNAL_INGESTION_TIMEOUT is not None
+        else request.app.state.config.EXTERNAL_INGESTION_TIMEOUT
+    )
+    # --- END EXTERNAL INGESTION PATCH ---
+
     log.info(
         f'Updating reranking model: {request.app.state.config.RAG_RERANKING_MODEL} to {form_data.RAG_RERANKING_MODEL}'
     )
@@ -1252,6 +1291,12 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         'RAG_EXTERNAL_MESSAGE_COUNT': request.app.state.config.RAG_EXTERNAL_MESSAGE_COUNT,
         'RAG_EXTERNAL_USER_MESSAGES_ONLY': request.app.state.config.RAG_EXTERNAL_USER_MESSAGES_ONLY,
         # --- END EXTERNAL RETRIEVAL PATCH ---
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        'EXTERNAL_INGESTION_ENGINE': request.app.state.config.EXTERNAL_INGESTION_ENGINE,
+        'EXTERNAL_INGESTION_URL': request.app.state.config.EXTERNAL_INGESTION_URL,
+        'EXTERNAL_INGESTION_API_KEY': request.app.state.config.EXTERNAL_INGESTION_API_KEY,
+        'EXTERNAL_INGESTION_TIMEOUT': request.app.state.config.EXTERNAL_INGESTION_TIMEOUT,
+        # --- END EXTERNAL INGESTION PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,
         'CHUNK_SIZE': request.app.state.config.CHUNK_SIZE,
@@ -1790,13 +1835,13 @@ async def process_file(
                     # --- BEGIN EXTERNAL INGESTION PATCH ---
                     # When EXTERNAL_INGESTION_ENGINE == "external", delegate
                     # chunk + embed + vector-store to the external ingestion
-                    # service. Limited to the fresh-file path; pre-extracted
-                    # content (form_data.content) and knowledge-base re-add
-                    # (form_data.collection_name) keep the in-process pipeline.
+                    # service. Pre-extracted content (form_data.content) keeps
+                    # the in-process pipeline; everything else (fresh upload,
+                    # KB add/update, reindex) routes to the external service,
+                    # which is idempotent per file_id via overwrite=true.
                     _use_external_ingest = (
                         request.app.state.config.EXTERNAL_INGESTION_ENGINE == 'external'
                         and not form_data.content
-                        and not form_data.collection_name
                         and bool(file.path)
                     )
 
@@ -1806,6 +1851,17 @@ async def process_file(
                             _without_scheme = file.path[len('s3://'):]
                             if '/' in _without_scheme:
                                 _s3_bucket, _s3_key = _without_scheme.split('/', 1)
+
+                        # Reindex / KB-add paths skip the fresh-upload branch
+                        # above, so the local `file_path` variable may be
+                        # unset. Fetch a local copy on demand for multipart
+                        # fallback; S3 mode doesn't need it.
+                        _local_file_path = None
+                        if not _s3_bucket:
+                            try:
+                                _local_file_path = Storage.get_file(file.path)
+                            except Exception:
+                                _local_file_path = None
 
                         _timeout_str = request.app.state.config.EXTERNAL_INGESTION_TIMEOUT
                         _timeout = int(_timeout_str) if _timeout_str else 300
@@ -1817,7 +1873,7 @@ async def process_file(
                             filename=file.filename,
                             collection_name=collection_name,
                             user_id=file.user_id,
-                            local_file_path=file_path,
+                            local_file_path=_local_file_path,
                             s3_bucket=_s3_bucket,
                             s3_key=_s3_key,
                             timeout=_timeout,

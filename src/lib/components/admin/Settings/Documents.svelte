@@ -1217,6 +1217,57 @@
 							</div>
 							<!-- END EXTERNAL RETRIEVAL PATCH -->
 
+							<!-- BEGIN EXTERNAL INGESTION PATCH -->
+							<div class="mb-2.5 flex flex-col w-full justify-between">
+								<div class="flex w-full justify-between">
+									<div class="self-center text-xs font-medium">
+										{$i18n.t('Ingestion Engine')}
+									</div>
+									<div class="flex items-center relative">
+										<select
+											class="w-fit pr-8 rounded-sm px-2 p-1 text-xs bg-transparent outline-hidden text-right"
+											bind:value={RAGConfig.EXTERNAL_INGESTION_ENGINE}
+											placeholder={$i18n.t('Select an ingestion engine')}
+										>
+											<option value="">{$i18n.t('Default (Built-in pipeline)')}</option>
+											<option value="external">{$i18n.t('External')}</option>
+										</select>
+									</div>
+								</div>
+
+								{#if RAGConfig.EXTERNAL_INGESTION_ENGINE === 'external'}
+									<div class="my-0.5 flex gap-2 pr-2">
+										<input
+											class="flex-1 w-full text-sm bg-transparent outline-hidden"
+											placeholder={$i18n.t('API Base URL')}
+											bind:value={RAGConfig.EXTERNAL_INGESTION_URL}
+											required
+										/>
+
+										<SensitiveInput
+											placeholder={$i18n.t('API Key')}
+											bind:value={RAGConfig.EXTERNAL_INGESTION_API_KEY}
+											required={false}
+										/>
+									</div>
+
+									<div class="mb-2.5 flex w-full justify-between">
+										<div class="self-center text-xs font-medium">
+											{$i18n.t('Request Timeout (s)')}
+										</div>
+										<div class="flex items-center relative">
+											<input
+												class="w-20 text-sm bg-transparent outline-hidden text-right"
+												type="number"
+												min="1"
+												bind:value={RAGConfig.EXTERNAL_INGESTION_TIMEOUT}
+											/>
+										</div>
+									</div>
+								{/if}
+							</div>
+							<!-- END EXTERNAL INGESTION PATCH -->
+
 							{#if RAGConfig.RAG_RETRIEVAL_ENGINE !== 'external'}
 							<div class="  mb-2.5 flex w-full justify-between">
 								<div class=" self-center text-xs font-medium">{$i18n.t('Hybrid Search')}</div>

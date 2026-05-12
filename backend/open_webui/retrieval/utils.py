@@ -1420,15 +1420,20 @@ async def get_sources_from_items(
                     query_result = await asyncio.to_thread(get_all_items_from_collections, collection_names)
                 # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
                 elif request.app.state.config.RAG_RETRIEVAL_ENGINE == "external":
-                    # Resolve the effective query generation template
+                    # Resolve the effective query generation template.
+                    # Reuses the existing QUERY_GENERATION_PROMPT_TEMPLATE
+                    # (config.py:1839) instead of a retrieval-specific one —
+                    # an earlier draft of this patch referenced
+                    # RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE which was
+                    # never registered, causing AttributeError at request time.
                     _template = (
-                        request.app.state.config.RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
+                        request.app.state.config.QUERY_GENERATION_PROMPT_TEMPLATE
                     )
                     if not (_template and _template.strip()):
                         from open_webui.config import (
-                            DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE,
+                            DEFAULT_QUERY_GENERATION_PROMPT_TEMPLATE,
                         )
-                        _template = DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE
+                        _template = DEFAULT_QUERY_GENERATION_PROMPT_TEMPLATE
 
                     query_result = await asyncio.to_thread(
                         query_external_retrieval,
