@@ -1713,6 +1713,19 @@ async def process_file(
             else:
                 await _validate_collection_access([collection_name], user, access_type='write')
 
+            # --- BEGIN COLLECTION ACCESS PATCH ---
+            # Enforce ownership on the write path. /query/doc and
+            # /query/collection already validate via
+            # _validate_collection_access; the /process/file write path
+            # didn't, so any authenticated user could write embeddings
+            # into another tenant's collection by supplying
+            # user-memory-<victim_uid> or file-<victim_file_id> in
+            # ProcessFileForm.collection_name. Reads were gated; writes
+            # were not.
+            # Ref: ingestion-service sec.md Finding 2 (cross-tenant write).
+            _validate_collection_access([collection_name], user)
+            # --- END COLLECTION ACCESS PATCH ---
+
             if form_data.content:
                 # Update the content in the file
                 # Usage: /files/{file_id}/data/content/update, /files/ (audio file upload pipeline)
