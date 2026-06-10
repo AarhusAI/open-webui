@@ -28,15 +28,15 @@ def query_external_retrieval(
     timeout: Optional[str] = None,
     user=None,
     messages: Optional[List[dict]] = None,
-    retrieval_query_generation_prompt_template: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Query an external retrieval service.
 
     POST {url}/search with queries + collection_names + k.
-    Optionally includes messages and the retrieval query generation prompt
-    template so the external service can generate queries using the same
-    template configured in Open WebUI.
+    Optionally includes the chat messages so the external service can
+    extract/generate its own queries from the conversation. Open WebUI's
+    QUERY_GENERATION_PROMPT_TEMPLATE is intentionally NOT forwarded — the
+    external service runs its own query generation.
     Returns dict with keys: documents, metadatas, distances (matching internal format).
     Returns None on error.
     """
@@ -48,11 +48,6 @@ def query_external_retrieval(
 
     if messages is not None:
         payload["messages"] = messages
-
-    if retrieval_query_generation_prompt_template:
-        payload["retrieval_query_generation_prompt_template"] = (
-            retrieval_query_generation_prompt_template
-        )
 
     try:
         headers = {
