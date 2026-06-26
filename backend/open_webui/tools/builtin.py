@@ -2343,6 +2343,9 @@ async def query_knowledge_files(
     __request__: Request = None,
     __user__: dict = None,
     __model_knowledge__: list[dict] = None,
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    __messages__: list = None,
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 ) -> str:
     """
     Search knowledge base files using semantic/vector search. Searches across collections (KBs),
@@ -2389,8 +2392,13 @@ async def query_knowledge_files(
         user_role = __user__.get('role', 'user')
         user_group_ids = [group.id for group in await Groups.get_groups_by_member_id(user_id)]
 
+        cfg = __request__.app.state.config
+        use_external = cfg.RAG_RETRIEVAL_ENGINE == 'external'
+
+        # The external retrieval engine embeds server-side, so a local embedding
+        # function is only required for the internal vector-DB path.
         embedding_function = __request__.app.state.EMBEDDING_FUNCTION
-        if not embedding_function:
+        if not use_external and not embedding_function:
             return json.dumps({'error': 'Embedding function not configured'})
 
         collection_names = []
@@ -2484,13 +2492,49 @@ async def query_knowledge_files(
 
         # Query vector collections if any
         if collection_names:
-            query_results = await query_collection(
-                __request__,
-                collection_names=collection_names,
-                queries=[query],
-                embedding_function=embedding_function,
-                k=count,
-            )
+            if use_external:
+                # Route to the external retrieval engine, mirroring the patch in
+                # retrieval/utils.py:get_sources_from_items. The LLM already
+                # generated `query` via the tool call, but we still forward the
+                # recent conversation so the external service's agentic pipeline
+                # has context for its own query generation. Trimming mirrors the
+                # chat_completion_files_handler patch so both paths honour the
+                # same RAG_EXTERNAL_MESSAGE_COUNT / USER_MESSAGES_ONLY settings.
+                from open_webui.retrieval.external import query_external_retrieval
+
+                messages_for_external = None
+                if __messages__:
+                    msg_count = cfg.RAG_EXTERNAL_MESSAGE_COUNT
+                    user_only = cfg.RAG_EXTERNAL_USER_MESSAGES_ONLY
+                    candidate_messages = __messages__
+                    if user_only:
+                        candidate_messages = [m for m in candidate_messages if m.get('role') == 'user']
+                    messages_for_external = [
+                        {'role': m.get('role', ''), 'content': m.get('content', '')}
+                        for m in candidate_messages[-msg_count:]
+                    ]
+
+                # query_external_retrieval is sync (requests-based); offload so
+                # the async caller's event loop stays free.
+                query_results = await asyncio.to_thread(
+                    query_external_retrieval,
+                    url=cfg.RAG_EXTERNAL_RETRIEVAL_URL,
+                    api_key=cfg.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+                    queries=[query],
+                    collection_names=collection_names,
+                    k=count,
+                    timeout=cfg.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+                    user=__user__,
+                    messages=messages_for_external,
+                )
+            else:
+                query_results = await query_collection(
+                    __request__,
+                    collection_names=collection_names,
+                    queries=[query],
+                    embedding_function=embedding_function,
+                    k=count,
+                )
 
             if query_results and 'documents' in query_results:
                 documents = query_results.get('documents', [[]])[0]

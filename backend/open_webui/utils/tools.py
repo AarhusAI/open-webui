@@ -631,6 +631,13 @@ async def get_builtin_tools(
                 '__chat_id__': extra_params.get('__chat_id__'),
                 '__message_id__': extra_params.get('__message_id__'),
                 '__model_knowledge__': model_knowledge,
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                # Forwarded so query_knowledge_files can hand the conversation
+                # to the external retrieval service (it only reaches the tool
+                # because the tool declares __messages__ in its signature; see
+                # get_async_tool_function_and_apply_extra_params).
+                '__messages__': extra_params.get('__messages__', []),
+                # --- END EXTERNAL RETRIEVAL PATCH ---
             },
         )
 

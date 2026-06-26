@@ -2876,6 +2876,12 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                 {
                     **extra_params,
                     '__event_emitter__': event_emitter,
+                    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                    # Forward the conversation so builtin knowledge tools
+                    # (query_knowledge_files) can pass it to the external
+                    # retrieval service for its own query generation.
+                    '__messages__': form_data['messages'],
+                    # --- END EXTERNAL RETRIEVAL PATCH ---
                     '__skill_ids__': [s.id for s in available_skills if s.id not in user_skill_ids],
                 },
                 features,
