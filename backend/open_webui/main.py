@@ -378,6 +378,7 @@ from open_webui.config import (
     THREAD_POOL_SIZE,
     TIKA_SERVER_URL,
     TIKTOKEN_ENCODING_NAME,
+    RAG_TOKENIZER_MODEL,
     TITLE_GENERATION_PROMPT_TEMPLATE,
     # Tool Server Configs
     TOOL_SERVER_CONNECTIONS,
@@ -1039,6 +1040,8 @@ app.state.config.TEXT_SPLITTER = RAG_TEXT_SPLITTER
 app.state.config.ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER = ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER
 
 app.state.config.TIKTOKEN_ENCODING_NAME = TIKTOKEN_ENCODING_NAME
+# AarhusAI patch: HF tokenizer used to size chunks for the 'token' splitter
+app.state.config.RAG_TOKENIZER_MODEL = RAG_TOKENIZER_MODEL
 
 app.state.config.CHUNK_SIZE = CHUNK_SIZE
 app.state.config.CHUNK_MIN_SIZE_TARGET = CHUNK_MIN_SIZE_TARGET

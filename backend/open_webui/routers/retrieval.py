@@ -7,6 +7,7 @@ import mimetypes
 import os
 import re
 import shutil
+import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -31,7 +32,9 @@ from langchain_core.documents import Document
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
+    Tokenizer,
     TokenTextSplitter,
+    split_text_on_tokens,
 )
 from open_webui.config import (
     DEFAULT_LOCALE,
@@ -39,6 +42,7 @@ from open_webui.config import (
     RAG_EMBEDDING_CONTENT_PREFIX,
     RAG_EMBEDDING_MODEL_AUTO_UPDATE,
     RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE,
+    RAG_EMBEDDING_PREFIX_FIELD_NAME,
     RAG_EMBEDDING_QUERY_PREFIX,
     RAG_RERANKING_MODEL_AUTO_UPDATE,
     RAG_RERANKING_MODEL_TRUST_REMOTE_CODE,
@@ -48,6 +52,7 @@ from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import (
     DEVICE_TYPE,
     DOCKER,
+    OFFLINE_MODE,
     RAG_EMBEDDING_TIMEOUT,
     SENTENCE_TRANSFORMERS_BACKEND,
     SENTENCE_TRANSFORMERS_CROSS_ENCODER_BACKEND,
@@ -477,6 +482,8 @@ async def get_rag_config(request: Request, user=Depends(get_admin_user)):
         # Chunking settings
         'TEXT_SPLITTER': request.app.state.config.TEXT_SPLITTER,
         'ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER': request.app.state.config.ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER,
+        # AarhusAI patch: HF tokenizer used to size chunks for the 'token' splitter
+        'RAG_TOKENIZER_MODEL': request.app.state.config.RAG_TOKENIZER_MODEL,
         'CHUNK_SIZE': request.app.state.config.CHUNK_SIZE,
         'CHUNK_MIN_SIZE_TARGET': request.app.state.config.CHUNK_MIN_SIZE_TARGET,
         'CHUNK_OVERLAP': request.app.state.config.CHUNK_OVERLAP,
@@ -695,6 +702,8 @@ class ConfigForm(BaseModel):
     # Chunking settings
     TEXT_SPLITTER: str | None = None
     ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER: bool | None = None
+    # AarhusAI patch: HF tokenizer used to size chunks for the 'token' splitter
+    RAG_TOKENIZER_MODEL: str | None = None
     CHUNK_SIZE: int | None = None
     CHUNK_MIN_SIZE_TARGET: int | None = None
     CHUNK_OVERLAP: int | None = None
@@ -1014,6 +1023,12 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
     request.app.state.config.CHUNK_OVERLAP = (
         form_data.CHUNK_OVERLAP if form_data.CHUNK_OVERLAP is not None else request.app.state.config.CHUNK_OVERLAP
     )
+    # AarhusAI patch: HF tokenizer used to size chunks for the 'token' splitter
+    request.app.state.config.RAG_TOKENIZER_MODEL = (
+        form_data.RAG_TOKENIZER_MODEL
+        if form_data.RAG_TOKENIZER_MODEL is not None
+        else request.app.state.config.RAG_TOKENIZER_MODEL
+    )
 
     # File upload settings
     # Empty string means "clear to None" (unlimited/no compression),
@@ -1180,6 +1195,8 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         'CHUNK_SIZE': request.app.state.config.CHUNK_SIZE,
         'CHUNK_MIN_SIZE_TARGET': request.app.state.config.CHUNK_MIN_SIZE_TARGET,
         'ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER': request.app.state.config.ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER,
+        # AarhusAI patch: HF tokenizer used to size chunks for the 'token' splitter
+        'RAG_TOKENIZER_MODEL': request.app.state.config.RAG_TOKENIZER_MODEL,
         'CHUNK_OVERLAP': request.app.state.config.CHUNK_OVERLAP,
         # File upload settings
         'FILE_MAX_SIZE': request.app.state.config.FILE_MAX_SIZE,
@@ -1281,6 +1298,85 @@ def can_merge_chunks(a: Document, b: Document) -> bool:
     return True
 
 
+# AarhusAI patch: use the embedding model's own tokenizer (e.g. bge-m3,
+# multilingual-e5-large) instead of tiktoken/cl100k_base when sizing chunks for
+# the 'token' splitter, so requests sent to the embedding endpoint have correct
+# token sizes/overlaps and never overflow the model's max sequence length.
+_hf_tokenizer_cache: dict[str, object] = {}
+_hf_tokenizer_lock = threading.Lock()
+
+
+def _get_embedding_tokenizer(request: Request) -> object | None:
+    """Return the HuggingFace tokenizer matching the configured embedding model,
+    or None to fall back to tiktoken. Cached per repo id; thread-safe because
+    ingestion runs in a threadpool."""
+    repo = str(request.app.state.config.RAG_TOKENIZER_MODEL) or str(request.app.state.config.RAG_EMBEDDING_MODEL)
+    if not repo:
+        return None
+    with _hf_tokenizer_lock:
+        if repo in _hf_tokenizer_cache:
+            return _hf_tokenizer_cache[repo]
+        try:
+            from transformers import AutoTokenizer
+
+            tok = AutoTokenizer.from_pretrained(
+                repo,
+                trust_remote_code=False,  # a tokenizer never needs remote code
+                local_files_only=OFFLINE_MODE,  # respect offline deployments
+            )
+        except Exception as e:
+            log.warning(
+                f'Could not load tokenizer "{repo}"; falling back to tiktoken '
+                f'(chunk sizes will NOT match the embedding model): {e}'
+            )
+            tok = None
+        # Cache None too: a load failure is deterministic (static repo id +
+        # OFFLINE_MODE), so retrying only repeats the work and spams the log.
+        _hf_tokenizer_cache[repo] = tok
+        return tok
+
+
+def _get_token_counter(request: Request) -> Callable[[str], int]:
+    """Return a str -> token-count function using the embedding model's tokenizer
+    when available, otherwise tiktoken."""
+    tok = _get_embedding_tokenizer(request)
+    if tok is not None:
+
+        def count_tokens(text: str) -> int:
+            return len(tok.encode(text, add_special_tokens=False))
+
+        return count_tokens
+
+    encoding = tiktoken.get_encoding(str(request.app.state.config.TIKTOKEN_ENCODING_NAME))
+
+    def count_tokens(text: str) -> int:
+        return len(encoding.encode(text))
+
+    return count_tokens
+
+
+def _effective_token_window(request: Request, tok) -> tuple[int, int]:
+    """Content-token budget after reserving the special tokens and the inlined
+    content prefix the embedding server adds at embed time, so the server-side
+    tokenization stays within the model's max sequence length."""
+    chunk_size = request.app.state.config.CHUNK_SIZE
+    overlap = request.app.state.config.CHUNK_OVERLAP
+    try:
+        reserved = tok.num_special_tokens_to_add(pair=False)  # e.g. <s>/</s> => 2
+    except Exception as e:  # heuristic must never break ingestion
+        log.debug(f'num_special_tokens_to_add failed, assuming 2: {e}')
+        reserved = 2
+    # The content prefix (e.g. e5's "passage: ") is inlined into the text before
+    # embedding when it isn't sent as a separate field (see generate_embeddings).
+    if RAG_EMBEDDING_CONTENT_PREFIX and RAG_EMBEDDING_PREFIX_FIELD_NAME is None:
+        reserved += len(tok.encode(RAG_EMBEDDING_CONTENT_PREFIX, add_special_tokens=False))
+    reserved += 1  # SentencePiece decode(encode()) round-trip drift safety margin
+    tokens_per_chunk = max(1, chunk_size - reserved)
+    # langchain's split_text_on_tokens raises ValueError if overlap >= window.
+    overlap = min(overlap, max(0, tokens_per_chunk - 1))
+    return tokens_per_chunk, overlap
+
+
 def merge_docs_to_target_size(
     request: Request,
     chunks: list[Document],
@@ -1304,8 +1400,9 @@ def merge_docs_to_target_size(
 
     measure: Callable[[str], int] = len
     if request.app.state.config.TEXT_SPLITTER == 'token':
-        encoding = tiktoken.get_encoding(str(request.app.state.config.TIKTOKEN_ENCODING_NAME))
-        measure = lambda text: len(encoding.encode(text))
+        # AarhusAI patch: count in the embedding model's tokens (falls back to
+        # tiktoken) so min-size merging matches the token splitter's units.
+        measure = _get_token_counter(request)
 
     def _merge_backward(result: list[Document], content: str, chunk: Document) -> bool:
         """Try to append content into the last emitted chunk. Returns True on success."""
@@ -1447,16 +1544,44 @@ def save_docs_to_vector_db(
             )
             docs = text_splitter.split_documents(docs)
         elif request.app.state.config.TEXT_SPLITTER == 'token':
-            log.info(f'Using token text splitter: {request.app.state.config.TIKTOKEN_ENCODING_NAME}')
+            # AarhusAI patch: prefer the embedding model's tokenizer so chunk
+            # token sizes/overlaps match what the embedding endpoint sees; fall
+            # back to tiktoken when no HF tokenizer can be resolved.
+            tok = _get_embedding_tokenizer(request)
+            if tok is not None:
+                tokens_per_chunk, overlap = _effective_token_window(request, tok)
+                log.info(
+                    f'Using embedding-model token splitter '
+                    f'({request.app.state.config.RAG_TOKENIZER_MODEL or request.app.state.config.RAG_EMBEDDING_MODEL}); '
+                    f'window={tokens_per_chunk} overlap={overlap}'
+                )
+                lc_tokenizer = Tokenizer(
+                    chunk_overlap=overlap,
+                    tokens_per_chunk=tokens_per_chunk,
+                    decode=lambda ids: tok.decode(ids),
+                    encode=lambda text: tok.encode(text, add_special_tokens=False),
+                )
+                split_docs = []
+                for doc in docs:
+                    split_docs.extend(
+                        Document(
+                            page_content=piece,
+                            metadata={**doc.metadata},
+                        )
+                        for piece in split_text_on_tokens(text=doc.page_content, tokenizer=lc_tokenizer)
+                    )
+                docs = split_docs
+            else:
+                log.info(f'Using token text splitter: {request.app.state.config.TIKTOKEN_ENCODING_NAME}')
 
-            tiktoken.get_encoding(str(request.app.state.config.TIKTOKEN_ENCODING_NAME))
-            text_splitter = TokenTextSplitter(
-                encoding_name=str(request.app.state.config.TIKTOKEN_ENCODING_NAME),
-                chunk_size=request.app.state.config.CHUNK_SIZE,
-                chunk_overlap=request.app.state.config.CHUNK_OVERLAP,
-                add_start_index=True,
-            )
-            docs = text_splitter.split_documents(docs)
+                tiktoken.get_encoding(str(request.app.state.config.TIKTOKEN_ENCODING_NAME))
+                text_splitter = TokenTextSplitter(
+                    encoding_name=str(request.app.state.config.TIKTOKEN_ENCODING_NAME),
+                    chunk_size=request.app.state.config.CHUNK_SIZE,
+                    chunk_overlap=request.app.state.config.CHUNK_OVERLAP,
+                    add_start_index=True,
+                )
+                docs = text_splitter.split_documents(docs)
         else:
             raise ValueError(ERROR_MESSAGES.DEFAULT('Invalid text splitter'))
 

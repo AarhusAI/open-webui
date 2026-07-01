@@ -1402,6 +1402,21 @@ TIKTOKEN_ENCODING_NAME = ConfigVar(
     os.getenv('TIKTOKEN_ENCODING_NAME', 'cl100k_base'),
 )
 
+# AarhusAI patch: HF tokenizer repo id used to size/split chunks for the 'token'
+# splitter so token counts match the configured embedding model (e.g. bge-m3,
+# multilingual-e5-large) instead of tiktoken/cl100k_base. Using the wrong
+# tokenizer mis-measures CHUNK_SIZE/CHUNK_OVERLAP on multilingual text, so chunks
+# can silently exceed the embedding model's max sequence length (truncated at the
+# server) or be far smaller than intended. Empty -> fall back to
+# RAG_EMBEDDING_MODEL, then to tiktoken. When the embedding model is served via an
+# OpenAI-compatible endpoint under an alias (e.g. "bge-m3"), set this to the real
+# HF repo id (e.g. "BAAI/bge-m3").
+RAG_TOKENIZER_MODEL = ConfigVar(
+    'RAG_TOKENIZER_MODEL',
+    'rag.tokenizer_model',
+    os.getenv('RAG_TOKENIZER_MODEL', ''),
+)
+
 
 CHUNK_SIZE = ConfigVar('CHUNK_SIZE', 'rag.chunk_size', int(os.getenv('CHUNK_SIZE', '1000')))
 
