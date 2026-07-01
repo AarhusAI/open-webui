@@ -172,4 +172,39 @@ def process_file_external_ingestion(
     except Exception as e:
         log.exception(f"Error in external ingestion: {e}")
         return None
+
+
+def delete_file_external_ingestion(
+    url: str,
+    api_key: str,
+    file_id: str,
+    timeout: int = 300,
+) -> Optional[dict]:
+    """Tell the external ingestion service to drop a file's vectors.
+
+    DELETE {url}/api/v1/documents/{file_id}. The vector store lives behind the
+    external service now, so Open WebUI's own vector-DB cleanup no longer reaches
+    it — this call keeps the two in sync when a file is deleted.
+
+    Best-effort: returns the service's response dict on success, or None on any
+    transport/server error (logged, never raised). Callers MUST NOT let a failed
+    cleanup block the user's file deletion. ``file_id`` is the bare file UUID —
+    the service matches on meta.file_id, not the "file-" collection name.
+    """
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        endpoint = f"{url.rstrip('/')}/api/v1/documents/{file_id}"
+        log.info(f"delete_file_external_ingestion: file_id={file_id}")
+        r = requests.delete(
+            endpoint,
+            headers=headers,
+            timeout=timeout,
+            verify=REQUESTS_VERIFY,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    except Exception as e:
+        log.exception(f"Error in external ingestion delete: {e}")
+        return None
 # --- END EXTERNAL INGESTION PATCH ---

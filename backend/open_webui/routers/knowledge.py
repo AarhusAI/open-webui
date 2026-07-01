@@ -25,6 +25,7 @@ from open_webui.models.knowledge import (
     KnowledgeUserResponse,
 )
 from open_webui.models.models import ModelForm, Models
+from open_webui.retrieval.external import delete_file_external_ingestion
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
 from open_webui.routers.retrieval import (
     BatchProcessFilesForm,
@@ -864,6 +865,7 @@ async def update_file_from_knowledge_by_id(
 
 @router.post('/{id}/file/remove', response_model=KnowledgeFilesResponse | None)
 async def remove_file_from_knowledge_by_id(
+    request: Request,
     id: str,
     form_data: KnowledgeFileIdForm,
     delete_file: bool = Query(True),
@@ -937,6 +939,28 @@ async def remove_file_from_knowledge_by_id(
 
         # Delete file from database
         await Files.delete_file_by_id(form_data.file_id, db=db)
+
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        # File is permanently deleted here (delete_file branch), so clean up its
+        # vectors in the external ingestion service too. Best-effort, never raises.
+        _cfg = request.app.state.config
+        if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+            try:
+                _timeout = (
+                    int(_cfg.EXTERNAL_INGESTION_TIMEOUT)
+                    if _cfg.EXTERNAL_INGESTION_TIMEOUT
+                    else 300
+                )
+                await asyncio.to_thread(
+                    delete_file_external_ingestion,
+                    url=_cfg.EXTERNAL_INGESTION_URL,
+                    api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                    file_id=form_data.file_id,
+                    timeout=_timeout,
+                )
+            except Exception as e:
+                log.debug(f'external ingestion delete for {form_data.file_id}: {e}')
+        # --- END EXTERNAL INGESTION PATCH ---
 
     if knowledge:
         return KnowledgeFilesResponse(
@@ -1194,6 +1218,7 @@ class SyncCleanupForm(BaseModel):
 
 @router.post('/{id}/sync/cleanup')
 async def sync_knowledge_cleanup(
+    request: Request,
     id: str,
     form_data: SyncCleanupForm,
     user=Depends(get_verified_user),
@@ -1232,6 +1257,28 @@ async def sync_knowledge_cleanup(
                 await asyncio.to_thread(Storage.delete_file, file.path)
             except Exception:
                 pass
+
+            # --- BEGIN EXTERNAL INGESTION PATCH ---
+            # Stale file permanently deleted during sync — clean up its vectors
+            # in the external ingestion service too. Best-effort, never raises.
+            _cfg = request.app.state.config
+            if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+                try:
+                    _timeout = (
+                        int(_cfg.EXTERNAL_INGESTION_TIMEOUT)
+                        if _cfg.EXTERNAL_INGESTION_TIMEOUT
+                        else 300
+                    )
+                    await asyncio.to_thread(
+                        delete_file_external_ingestion,
+                        url=_cfg.EXTERNAL_INGESTION_URL,
+                        api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                        file_id=file_id,
+                        timeout=_timeout,
+                    )
+                except Exception as e:
+                    log.debug(f'external ingestion delete for {file_id}: {e}')
+            # --- END EXTERNAL INGESTION PATCH ---
 
     # ── Remove orphaned directories (children before parents) ──
     for dir_id in reversed(form_data.dir_ids):

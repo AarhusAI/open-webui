@@ -37,6 +37,7 @@ from open_webui.models.files import (
 from open_webui.models.groups import Groups
 from open_webui.models.knowledge import Knowledges
 from open_webui.models.users import Users
+from open_webui.retrieval.external import delete_file_external_ingestion
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
 from open_webui.routers.audio import transcribe
 from open_webui.routers.retrieval import ProcessFileForm, process_file
@@ -859,7 +860,12 @@ async def rename_file_by_id(
 
 
 @router.delete('/{id}')
-async def delete_file_by_id(id: str, user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)):
+async def delete_file_by_id(
+    request: Request,
+    id: str,
+    user=Depends(get_verified_user),
+    db: AsyncSession = Depends(get_async_session),
+):
     file = await Files.get_file_by_id(id, db=db)
 
     if not file:
@@ -894,6 +900,30 @@ async def delete_file_by_id(id: str, user=Depends(get_verified_user), db: AsyncS
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=ERROR_MESSAGES.DEFAULT('Error deleting files'),
                 )
+            # --- BEGIN EXTERNAL INGESTION PATCH ---
+            # The vector store lives behind the external ingestion service now,
+            # so the ASYNC_VECTOR_DB_CLIENT deletes above don't reach it. Notify
+            # the service so this file's chunks don't outlive the file. Kept
+            # OUTSIDE the try above (which re-raises as HTTP 400) and best-effort
+            # — a failed cleanup must never fail the user's delete.
+            _cfg = request.app.state.config
+            if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+                try:
+                    _timeout = (
+                        int(_cfg.EXTERNAL_INGESTION_TIMEOUT)
+                        if _cfg.EXTERNAL_INGESTION_TIMEOUT
+                        else 300
+                    )
+                    await asyncio.to_thread(
+                        delete_file_external_ingestion,
+                        url=_cfg.EXTERNAL_INGESTION_URL,
+                        api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                        file_id=id,
+                        timeout=_timeout,
+                    )
+                except Exception as e:
+                    log.debug(f'external ingestion delete for {id}: {e}')
+            # --- END EXTERNAL INGESTION PATCH ---
             return {'message': 'File deleted successfully'}
         else:
             raise HTTPException(
