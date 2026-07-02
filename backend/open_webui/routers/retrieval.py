@@ -1872,14 +1872,17 @@ async def process_file(
                         _local_file_path = None
                         if not _s3_bucket:
                             try:
-                                _local_file_path = Storage.get_file(file.path)
+                                _local_file_path = await asyncio.to_thread(
+                                    Storage.get_file, file.path
+                                )
                             except Exception:
                                 _local_file_path = None
 
                         _timeout_str = request.app.state.config.EXTERNAL_INGESTION_TIMEOUT
                         _timeout = int(_timeout_str) if _timeout_str else 300
 
-                        _ingest_result = process_file_external_ingestion(
+                        _ingest_result = await asyncio.to_thread(
+                            process_file_external_ingestion,
                             url=request.app.state.config.EXTERNAL_INGESTION_URL,
                             api_key=request.app.state.config.EXTERNAL_INGESTION_API_KEY,
                             file_id=file.id,
