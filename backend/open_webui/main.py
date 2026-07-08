@@ -510,8 +510,7 @@ from open_webui.routers import (
     utils,
 )
 
-# patch (AAK): data pruning endpoint — kept as a separate import so the
-# patch diff stays isolated from the upstream import block above.
+# AarhusAI patch: data pruning endpoint
 from open_webui.routers import aak_prune
 
 from open_webui.routers.retrieval import (
@@ -1453,7 +1452,7 @@ if ENABLE_ADMIN_ANALYTICS:
     app.include_router(analytics.router, prefix='/api/v1/analytics', tags=['analytics'])
 app.include_router(utils.router, prefix='/api/v1/utils', tags=['utils'])
 
-# patch (AAK): data pruning endpoint (admin-only, cron-driven data retention)
+# AarhusAI patch: data pruning endpoint
 app.include_router(aak_prune.router, prefix='/api/v1/prune', tags=['prune'])
 app.include_router(terminals.router, prefix='/api/v1/terminals', tags=['terminals'])
 app.include_router(automations.router, prefix='/api/v1/automations', tags=['automations'])
