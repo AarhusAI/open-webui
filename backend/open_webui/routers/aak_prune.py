@@ -42,7 +42,8 @@ async def prune_chats(
     user=Depends(get_admin_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    cutoff = int(time.time()) - days * 86400
+    # Chats last updated before this epoch timestamp are pruned.
+    cutoff = int(time.time()) - days * 24 * 60 * 60
 
     # Pinned chats are deliberately spared; archived chats are pruned by age
     # like any other. Oldest first, so a limited run works through the backlog.
