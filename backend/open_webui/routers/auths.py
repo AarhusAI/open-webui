@@ -1489,10 +1489,13 @@ async def _check_api_key_permission(request: Request, user, db: AsyncSession):
         )
 
 
+# PATCH (AarhusAI/open-webui#41, ticket 5511): API keys are admin-only in this fork — admins mint
+# them for users via /users/{user_id}/api_key. Only the get_admin_user dependency differs from
+# upstream; _check_api_key_permission still enforces the global auth.enable_api_keys toggle.
 # create api key
 @router.post('/api_key', response_model=ApiKey)
 async def generate_api_key(
-    request: Request, user=Depends(get_current_user), db: AsyncSession = Depends(get_async_session)
+    request: Request, user=Depends(get_admin_user), db: AsyncSession = Depends(get_async_session)
 ):
     await _check_api_key_permission(request, user, db)
 
@@ -1517,7 +1520,7 @@ async def generate_api_key(
 # delete api key
 @router.delete('/api_key', response_model=bool)
 async def delete_api_key(
-    request: Request, user=Depends(get_current_user), db: AsyncSession = Depends(get_async_session)
+    request: Request, user=Depends(get_admin_user), db: AsyncSession = Depends(get_async_session)
 ):
     await _check_api_key_permission(request, user, db)
     success = await Users.delete_user_api_key_by_id(user.id, db=db)
@@ -1534,7 +1537,7 @@ async def delete_api_key(
 
 # get api key
 @router.get('/api_key', response_model=ApiKey)
-async def get_api_key(request: Request, user=Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def get_api_key(request: Request, user=Depends(get_admin_user), db: AsyncSession = Depends(get_async_session)):
     await _check_api_key_permission(request, user, db)
     api_key = await Users.get_user_api_key_by_id(user.id, db=db)
     if api_key:

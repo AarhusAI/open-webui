@@ -478,14 +478,9 @@ async def get_current_user_by_api_key(request, api_key: str):
     if not config_values.get('auth.enable_api_keys'):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.API_KEY_NOT_ALLOWED)
 
-    if user.role != 'admin':
-        user_permissions = config_values.get('user.permissions')
-        if not await has_permission(
-            user.id,
-            'features.api_keys',
-            user_permissions,
-        ):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.API_KEY_NOT_ALLOWED)
+    # PATCH (AarhusAI/open-webui#41, ticket 5511): upstream also requires the per-user
+    # 'features.api_keys' permission here. Removed — keys are admin-issued on the user's behalf,
+    # so the user need not hold the permission. The global toggle above still gates usage.
 
     # Enforce endpoint restrictions — checked here (not in middleware)
     # so it applies regardless of how the API key was transported
