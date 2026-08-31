@@ -424,7 +424,71 @@
 
 	{#if RAGConfig}
 		<div class="flex-1 min-h-0 overflow-y-auto scrollbar-hover pr-1.5">
-			<AdminSettingSection title={$i18n.t('Content Extraction')} first>
+			<!-- BEGIN EXTERNAL INGESTION PATCH -->
+			<AdminSettingSection title={$i18n.t('Ingestion')} first>
+				<AdminSettingRow
+					label={$i18n.t('Ingestion Engine')}
+					description={$i18n.t(
+						'Delegate text extraction, chunking, embedding and vector storage to an external service.'
+					)}
+				>
+					<SettingsSelect
+						bind:value={RAGConfig.EXTERNAL_INGESTION_ENGINE}
+						placeholder={$i18n.t('Select an ingestion engine')}
+					>
+						<option value="">{$i18n.t('Default (Built-in pipeline)')}</option>
+						<option value="external">{$i18n.t('External')}</option>
+					</SettingsSelect>
+				</AdminSettingRow>
+
+				{#if RAGConfig.EXTERNAL_INGESTION_ENGINE === 'external'}
+					<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
+						<AdminSettingField
+							label={$i18n.t('API Base URL')}
+							description={$i18n.t('External ingestion service endpoint.')}
+						>
+							<input
+								class={inputClass}
+								placeholder={$i18n.t('API Base URL')}
+								bind:value={RAGConfig.EXTERNAL_INGESTION_URL}
+								required
+							/>
+						</AdminSettingField>
+						<AdminSettingField
+							label={$i18n.t('API Key')}
+							description={$i18n.t('API key sent to the external ingestion service.')}
+						>
+							<SensitiveInput
+								variant="settings"
+								placeholder={$i18n.t('API Key')}
+								bind:value={RAGConfig.EXTERNAL_INGESTION_API_KEY}
+								required={false}
+							/>
+						</AdminSettingField>
+					</div>
+
+					<AdminSettingField
+						label={$i18n.t('Request Timeout (s)')}
+						description={$i18n.t('Maximum time to wait for the external ingestion service.')}
+					>
+						<input
+							class={inputClass}
+							type="number"
+							min="1"
+							bind:value={RAGConfig.EXTERNAL_INGESTION_TIMEOUT}
+						/>
+					</AdminSettingField>
+				{/if}
+			</AdminSettingSection>
+			<!-- END EXTERNAL INGESTION PATCH -->
+
+			<AdminSettingSection title={$i18n.t('Content Extraction')}>
+				<!-- BEGIN EXTERNAL INGESTION PATCH -->
+				<!-- Extraction runs in the external service. Guard is deliberately NOT
+				     re-indenting its content: keeping upstream's lines byte-identical
+				     keeps this patch rebase-friendly across releases. -->
+				{#if RAGConfig.EXTERNAL_INGESTION_ENGINE !== 'external'}
+				<!-- END EXTERNAL INGESTION PATCH -->
 				<AdminSettingRow
 					label={$i18n.t('Content Extraction Engine')}
 					description={$i18n.t('Choose how uploaded documents are parsed before indexing.')}
@@ -886,6 +950,9 @@
 						/>
 					</AdminSettingField>
 				{/if}
+				<!-- BEGIN EXTERNAL INGESTION PATCH -->
+				{/if}
+				<!-- END EXTERNAL INGESTION PATCH -->
 
 				<AdminSettingRow
 					label={$i18n.t('Bypass Embedding and Retrieval')}
@@ -900,7 +967,9 @@
 					/>
 				</AdminSettingRow>
 
-				{#if !RAGConfig.BYPASS_EMBEDDING_AND_RETRIEVAL}
+				<!-- BEGIN EXTERNAL INGESTION PATCH: chunking runs in the external service -->
+				{#if !RAGConfig.BYPASS_EMBEDDING_AND_RETRIEVAL && RAGConfig.EXTERNAL_INGESTION_ENGINE !== 'external'}
+					<!-- END EXTERNAL INGESTION PATCH -->
 					<AdminSettingRow
 						label={$i18n.t('Text Splitter')}
 						description={$i18n.t('Choose how extracted text is split before indexing.')}
@@ -993,6 +1062,15 @@
 
 			{#if !RAGConfig.BYPASS_EMBEDDING_AND_RETRIEVAL}
 				<AdminSettingSection title={$i18n.t('Embedding')}>
+					<!-- BEGIN EXTERNAL INGESTION PATCH -->
+					{#if RAGConfig.EXTERNAL_INGESTION_ENGINE === 'external'}
+						<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+							{$i18n.t(
+								'When external ingestion is enabled, this model is used only to encode queries at retrieval time. It must match the embedding model configured in the ingestion service.'
+							)}
+						</div>
+					{/if}
+					<!-- END EXTERNAL INGESTION PATCH -->
 					<AdminSettingRow
 						label={$i18n.t('Embedding Model Engine')}
 						description={$i18n.t('Provider used to generate document embeddings.')}
@@ -1214,6 +1292,100 @@
 					</AdminSettingRow>
 
 					{#if !RAGConfig.RAG_FULL_CONTEXT}
+						<!-- BEGIN EXTERNAL RETRIEVAL PATCH -->
+						<AdminSettingRow
+							label={$i18n.t('Retrieval Engine')}
+							description={$i18n.t('Delegate document search to an external retrieval service.')}
+						>
+							<SettingsSelect
+								bind:value={RAGConfig.RAG_RETRIEVAL_ENGINE}
+								placeholder={$i18n.t('Select a retrieval engine')}
+							>
+								<option value="">{$i18n.t('Default (Built-in Vector DB)')}</option>
+								<option value="external">{$i18n.t('External')}</option>
+							</SettingsSelect>
+						</AdminSettingRow>
+
+						{#if RAGConfig.RAG_RETRIEVAL_ENGINE === 'external'}
+							<div class="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
+								<AdminSettingField
+									label={$i18n.t('API Base URL')}
+									description={$i18n.t('External retrieval service endpoint.')}
+								>
+									<input
+										class={inputClass}
+										placeholder={$i18n.t('API Base URL')}
+										bind:value={RAGConfig.RAG_EXTERNAL_RETRIEVAL_URL}
+										required
+									/>
+								</AdminSettingField>
+								<AdminSettingField
+									label={$i18n.t('API Key')}
+									description={$i18n.t('API key sent to the external retrieval service.')}
+								>
+									<SensitiveInput
+										variant="settings"
+										placeholder={$i18n.t('API Key')}
+										bind:value={RAGConfig.RAG_EXTERNAL_RETRIEVAL_API_KEY}
+										required={false}
+									/>
+								</AdminSettingField>
+							</div>
+
+							<AdminSettingField
+								label={$i18n.t('Request Timeout (s)')}
+								description={$i18n.t('Maximum time to wait for the external retrieval service.')}
+							>
+								<input
+									class={inputClass}
+									type="number"
+									min="1"
+									bind:value={RAGConfig.RAG_EXTERNAL_RETRIEVAL_TIMEOUT}
+								/>
+							</AdminSettingField>
+
+							<AdminSettingRow
+								label={$i18n.t('Bypass Query Generation')}
+								description={$i18n.t(
+									'Skip local query generation and forward the conversation to the external service.'
+								)}
+								let:labelId
+							>
+								<Switch
+									bind:state={RAGConfig.RAG_EXTERNAL_BYPASS_QUERY_GENERATION}
+									ariaLabelledbyId={labelId}
+								/>
+							</AdminSettingRow>
+
+							{#if RAGConfig.RAG_EXTERNAL_BYPASS_QUERY_GENERATION}
+								<AdminSettingField
+									label={$i18n.t('Message Count')}
+									description={$i18n.t(
+										'Number of recent messages forwarded to the external service.'
+									)}
+								>
+									<input
+										class={inputClass}
+										type="number"
+										min="1"
+										bind:value={RAGConfig.RAG_EXTERNAL_MESSAGE_COUNT}
+									/>
+								</AdminSettingField>
+
+								<AdminSettingRow
+									label={$i18n.t('User Messages Only')}
+									description={$i18n.t('Forward only user messages, not assistant replies.')}
+									let:labelId
+								>
+									<Switch
+										bind:state={RAGConfig.RAG_EXTERNAL_USER_MESSAGES_ONLY}
+										ariaLabelledbyId={labelId}
+									/>
+								</AdminSettingRow>
+							{/if}
+						{/if}
+						<!-- END EXTERNAL RETRIEVAL PATCH -->
+
 						<AdminSettingRow
 							label={$i18n.t('Hybrid Search')}
 							description={$i18n.t('Combine semantic and keyword retrieval.')}

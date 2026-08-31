@@ -35,6 +35,14 @@ from open_webui.models.knowledge import (
 )
 from open_webui.models.models import ModelForm, Models
 from open_webui.retrieval.external import retrieve_external_knowledge, retrieve_external_knowledge_for_connection
+
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+from open_webui.retrieval.external_service import (
+    delete_file_external_ingestion,
+    get_external_rag_config,
+)
+
+# --- END EXTERNAL INGESTION PATCH ---
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
 from open_webui.routers.retrieval import (
     BatchProcessFilesForm,
@@ -1658,6 +1666,24 @@ async def remove_file_from_knowledge_by_id(
     if delete_file and (file.user_id == user.id or user.role == 'admin'):
         await delete_file_resource(file, db)
 
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        # File is permanently deleted here (delete_file branch), so clean up its
+        # vectors in the external ingestion service too. Best-effort, never raises.
+        _cfg = await get_external_rag_config()
+        if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+            try:
+                _timeout = int(_cfg.EXTERNAL_INGESTION_TIMEOUT) if _cfg.EXTERNAL_INGESTION_TIMEOUT else 300
+                await asyncio.to_thread(
+                    delete_file_external_ingestion,
+                    url=_cfg.EXTERNAL_INGESTION_URL,
+                    api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                    file_id=form_data.file_id,
+                    timeout=_timeout,
+                )
+            except Exception as e:
+                log.debug(f'external ingestion delete for {form_data.file_id}: {e}')
+        # --- END EXTERNAL INGESTION PATCH ---
+
     if knowledge:
         response = KnowledgeFilesResponse(
             **knowledge.model_dump(),
@@ -1999,6 +2025,24 @@ async def sync_knowledge_cleanup(
             and (file.user_id == user.id or user.role == 'admin')
         ):
             await delete_file_resource(file, db)
+
+            # --- BEGIN EXTERNAL INGESTION PATCH ---
+            # Stale file permanently deleted during sync — clean up its vectors
+            # in the external ingestion service too. Best-effort, never raises.
+            _cfg = await get_external_rag_config()
+            if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+                try:
+                    _timeout = int(_cfg.EXTERNAL_INGESTION_TIMEOUT) if _cfg.EXTERNAL_INGESTION_TIMEOUT else 300
+                    await asyncio.to_thread(
+                        delete_file_external_ingestion,
+                        url=_cfg.EXTERNAL_INGESTION_URL,
+                        api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                        file_id=file_id,
+                        timeout=_timeout,
+                    )
+                except Exception as e:
+                    log.debug(f'external ingestion delete for {file_id}: {e}')
+            # --- END EXTERNAL INGESTION PATCH ---
 
     # ── Remove orphaned directories (children before parents) ──
     for dir_id in reversed(form_data.dir_ids):
