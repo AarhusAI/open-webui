@@ -1300,6 +1300,9 @@ async def get_available_models(request: Request) -> list[dict]:
                     f'{base_url}/audio/models',
                     ssl=AIOHTTP_CLIENT_SESSION_SSL,
                     timeout=_timeout,
+                    headers={
+                        "Authorization": f"Bearer {request.app.state.config.TTS_API_KEY}",
+                    },
                 ) as resp:
                     resp.raise_for_status()
                     data = await resp.json()
@@ -1311,6 +1314,9 @@ async def get_available_models(request: Request) -> list[dict]:
                         f'{base_url}/models',
                         ssl=AIOHTTP_CLIENT_SESSION_SSL,
                         timeout=_timeout,
+                        headers={
+                            "Authorization": f"Bearer {request.app.state.config.TTS_API_KEY}",
+                        },
                     ) as resp:
                         resp.raise_for_status()
                         data = await resp.json()
@@ -1374,6 +1380,9 @@ async def get_available_voices(request) -> dict:
                     f'{base_url}/audio/voices',
                     ssl=AIOHTTP_CLIENT_SESSION_SSL,
                     timeout=_timeout,
+                    headers={
+                        "Authorization": f"Bearer {request.app.state.config.TTS_API_KEY}",
+                    },
                 ) as resp:
                     resp.raise_for_status()
                     data = await resp.json()
