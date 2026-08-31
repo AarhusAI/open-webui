@@ -2343,6 +2343,32 @@ Strictly return in JSON format:
 </chat_history>
 """
 
+# Retrieval (knowledge base) queries need a different prompt than web search queries:
+# semantic vector search rewards natural-language phrasings over keyword queries.
+RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE = os.getenv('RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE', '')
+
+DEFAULT_RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE = """### Task:
+Analyze the chat history and generate 1-3 search queries optimized for retrieving relevant documents from a knowledge base using semantic vector search.
+
+### Guidelines:
+- Respond **EXCLUSIVELY** with a JSON object.
+- Base queries on the **user's questions and information needs only**. Use assistant responses solely for context and disambiguation (e.g. resolving "that", "it", "the one you mentioned").
+- Generate queries as natural-language phrases that capture the semantic meaning of the user's information need.
+- Reformulate conversational references into standalone, self-contained queries.
+- Each query should target a different aspect or angle to maximize retrieval coverage.
+- If the user's message clearly needs no document retrieval (e.g. greetings), return: { "queries": [] }
+- Respond in the same language as the user's messages.
+- Today's date is: {{CURRENT_DATE}}
+
+### Output:
+{ "queries": ["query1", "query2"] }
+
+### Chat History:
+<chat_history>
+{{MESSAGES:END:4}}
+</chat_history>
+"""
+
 ENABLE_AUTOCOMPLETE_GENERATION = os.getenv('ENABLE_AUTOCOMPLETE_GENERATION', 'False').lower() == 'true'
 
 AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH = int(os.getenv('AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH', '-1'))
@@ -3152,6 +3178,7 @@ DEFAULT_CONFIG = {
     'task.query.search.enable': ENABLE_SEARCH_QUERY_GENERATION,
     'task.query.retrieval.enable': ENABLE_RETRIEVAL_QUERY_GENERATION,
     'task.query.prompt_template': QUERY_GENERATION_PROMPT_TEMPLATE,
+    'task.query.retrieval_prompt_template': RETRIEVAL_QUERY_GENERATION_PROMPT_TEMPLATE,
     'task.autocomplete.enable': ENABLE_AUTOCOMPLETE_GENERATION,
     'task.autocomplete.input_max_length': AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH,
     'task.autocomplete.prompt_template': AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE,
