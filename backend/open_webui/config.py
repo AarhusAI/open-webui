@@ -1648,6 +1648,23 @@ WEBUI_URL = os.getenv('WEBUI_URL', '')
 
 ENABLE_SIGNUP = False if not WEBUI_AUTH else os.getenv('ENABLE_SIGNUP', 'True').lower() == 'true'
 
+
+# PATCH EXTRA LOGIN INFO
+# Links shown on the login page: users must request access in Aarhus Kommune's
+# system register before their first sign-in. Env-only, never admin-editable,
+# so they are plain constants rather than DEFAULT_CONFIG entries.
+SYSTEM_REGISTER_URL = os.environ.get('SYSTEM_REGISTER_URL', '')
+
+SYSTEM_REGISTER_GUIDE_URL = os.environ.get('SYSTEM_REGISTER_GUIDE_URL', '')
+# /PATCH EXTRA LOGIN INFO
+
+
+# PATCH ADD LOGO TO SIDEBAR
+# Municipality logo pinned to the bottom of the sidebar.
+LOGO_URL = os.environ.get('LOGO_URL', '')
+# /PATCH ADD LOGO TO SIDEBAR
+
+
 ENABLE_LOGIN_FORM = os.getenv('ENABLE_LOGIN_FORM', 'True').lower() == 'true'
 
 ENABLE_PASSWORD_CHANGE_FORM = os.getenv('ENABLE_PASSWORD_CHANGE_FORM', 'True').lower() == 'true'

@@ -67,6 +67,13 @@ from open_webui.config import (
     STATIC_DIR,
     THREAD_POOL_SIZE,
     THREAD_POOL_THREAD_NAME_PREFIX,
+    # PATCH EXTRA LOGIN INFO
+    SYSTEM_REGISTER_URL,
+    SYSTEM_REGISTER_GUIDE_URL,
+    # /PATCH EXTRA LOGIN INFO
+    # PATCH ADD LOGO TO SIDEBAR
+    LOGO_URL,
+    # /PATCH ADD LOGO TO SIDEBAR
     WEBUI_AUTH,
     WEBUI_NAME,
     async_reset_config,
@@ -2292,6 +2299,17 @@ async def get_app_config(request: Request):
                 else {}
             ),
             'auto_redirect': config.get('oauth.auto_redirect'),
+        },
+        # Environment variables for patches. Public/pre-auth: the login page reads
+        # these before a token exists.
+        'extended_features': {
+            # PATCH EXTRA LOGIN INFO
+            'system_register_url': SYSTEM_REGISTER_URL,
+            'system_register_guide_url': SYSTEM_REGISTER_GUIDE_URL,
+            # /PATCH EXTRA LOGIN INFO
+            # PATCH ADD LOGO TO SIDEBAR
+            'logo_url': LOGO_URL,
+            # /PATCH ADD LOGO TO SIDEBAR
         },
         'features': {
             # --- Public: required by login/signup page pre-auth ---
