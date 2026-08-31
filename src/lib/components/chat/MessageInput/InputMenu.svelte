@@ -210,6 +210,7 @@
 						</button>
 					</Tooltip>
 
+					{#if $user?.role === 'admin' || $user?.permissions.chat?.image_capture}
 					<Tooltip
 						content={fileUploadCapableModels.length !== selectedModels.length
 							? $i18n.t('Model(s) do not support file upload')
@@ -242,6 +243,7 @@
 							<div class=" line-clamp-1">{$i18n.t('Capture')}</div>
 						</button>
 					</Tooltip>
+					{/if}
 
 					<Tooltip
 						content={!webUploadEnabled
@@ -330,6 +332,7 @@
 						</Tooltip>
 					{/if}
 
+					{#if $user?.role === 'admin' || $user?.permissions.chat?.attach_knowledge}
 					<Tooltip
 						content={fileUploadCapableModels.length !== selectedModels.length
 							? $i18n.t('Model(s) do not support file upload')
@@ -359,6 +362,7 @@
 							</div>
 						</button>
 					</Tooltip>
+					{/if}
 
 					<Tooltip
 						content={fileUploadCapableModels.length !== selectedModels.length
