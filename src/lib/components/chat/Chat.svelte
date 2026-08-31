@@ -4411,6 +4411,16 @@
 								</div>
 							</div>
 
+							<!-- PATCH ADD BANNERS TO CHAT INPUT -->
+							{#if !showCommands}
+								{#each $banners as banner}
+									{#if !banner.dismissible}
+										<Banner {banner} className="mx-4 my-2" />
+									{/if}
+								{/each}
+							{/if}
+							<!-- /PATCH ADD BANNERS TO CHAT INPUT -->
+
 							{#if readOnly}
 								<div class="pb-6 z-10">
 									<div class="text-xs text-gray-400 dark:text-gray-500 text-center">
