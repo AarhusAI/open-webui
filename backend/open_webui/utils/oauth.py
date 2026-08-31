@@ -1562,8 +1562,12 @@ class OAuthManager:
                 matched = False
                 for allowed_role in oauth_allowed_roles:
                     if allowed_role == '*' or allowed_role in oauth_roles:
-                        log.debug('Assigned user the user role')
-                        role = 'user'
+                        log.debug(f'Using first role from OAuth: {oauth_roles[0]}')
+                        first_role = oauth_roles[0]
+                        if first_role == "end-user":
+                            role = 'user'
+                        else:
+                            role = first_role
                         matched = True
                         break
                 for admin_role in oauth_admin_roles:

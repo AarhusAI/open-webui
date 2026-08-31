@@ -516,7 +516,7 @@ async def get_current_user_by_api_key(request, api_key: str):
     return user
 
 
-VERIFIED_USER_ROLES = {'user', 'admin'}
+VERIFIED_USER_ROLES = {'user', 'admin', 'builder', 'local-admin'}
 
 
 def get_verified_user(user=Depends(get_current_user)):
