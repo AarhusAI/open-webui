@@ -2596,6 +2596,20 @@ ENABLE_OAUTH_GROUP_MANAGEMENT = os.getenv('ENABLE_OAUTH_GROUP_MANAGEMENT', 'Fals
 
 ENABLE_OAUTH_GROUP_CREATION = os.getenv('ENABLE_OAUTH_GROUP_CREATION', 'False').lower() == 'true'
 
+# PATCH OIDC
+AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING = (
+    os.environ.get("AAK_OAUTH_ENABLE_ROLE_GROUPS_MAPPING", "False").lower() == "true"
+)
+# AAK Group claim configuration
+AAK_OAUTH_GROUP_CLAIMS = os.environ.get(
+    "AAK_OAUTH_GROUP_CLAIMS",
+    '["companyname", "division", "department", "extensionAttribute12", "Office"]'
+)
+AAK_OAUTH_GROUP_ID_CLAIM = os.environ.get("AAK_OAUTH_GROUP_ID_CLAIM", "extensionAttribute7")
+AAK_OAUTH_GROUP_ID_SEPARATOR = os.environ.get("AAK_OAUTH_GROUP_ID_SEPARATOR", ";")
+# Debug: Override OAuth roles for testing
+AAK_OAUTH_DEBUG_FORCE_ROLE = os.environ.get("AAK_OAUTH_DEBUG_FORCE_ROLE", "")
+# //PATCH OIDC
 
 oauth_group_default_share = os.getenv('OAUTH_GROUP_DEFAULT_SHARE', 'true').strip().lower()
 OAUTH_GROUP_DEFAULT_SHARE = 'members' if oauth_group_default_share == 'members' else oauth_group_default_share == 'true'
