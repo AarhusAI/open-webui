@@ -7,6 +7,7 @@ import re
 import sys
 import urllib
 import uuid
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import partialmethod
