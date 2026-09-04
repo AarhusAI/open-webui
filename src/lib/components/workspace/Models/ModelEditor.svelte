@@ -2,7 +2,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import { onMount, getContext, tick } from 'svelte';
-	import { models, tools, functions, user } from '$lib/stores';
+	import { models, tools, functions, user, config } from '$lib/stores';
 	import { WEBUI_BASE_URL, DEFAULT_CAPABILITIES } from '$lib/constants';
 
 	import { getTools } from '$lib/apis/tools';
@@ -882,7 +882,7 @@
 						</section>
 
 						<hr class=" border-gray-100/30 dark:border-gray-850/30 my-2" />
-
+						{#if $config?.features?.enable_prompt_suggestions}
 						<section class="my-2.5">
 							<div class="flex w-full items-center justify-between">
 								<div class="self-center text-xs text-gray-400 dark:text-gray-600">
@@ -912,6 +912,7 @@
 								<PromptSuggestions bind:promptSuggestions={info.meta.suggestion_prompts} />
 							{/if}
 						</section>
+						{/if}
 
 						<div class="my-3">
 							<Knowledge bind:selectedItems={knowledge} />
