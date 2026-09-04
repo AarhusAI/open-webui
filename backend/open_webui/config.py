@@ -1660,6 +1660,8 @@ DEFAULT_MODELS = os.getenv('DEFAULT_MODELS', None)
 
 DEFAULT_PINNED_MODELS = os.getenv('DEFAULT_PINNED_MODELS', None)
 
+ENABLE_PROMPT_SUGGESTIONS = os.getenv('ENABLE_PROMPT_SUGGESTIONS', 'True').lower() == 'true'
+
 try:
     default_prompt_suggestions = JSONCodec.loads(os.getenv('DEFAULT_PROMPT_SUGGESTIONS', '[]'))
 except Exception as e:
@@ -3097,6 +3099,7 @@ DEFAULT_CONFIG = {
     'ui.default_interface_settings': DEFAULT_INTERFACE_SETTINGS,
     'ui.prompt_suggestions': DEFAULT_PROMPT_SUGGESTIONS,
     'ui.model_order_list': MODEL_ORDER_LIST,
+    'ui.enable_prompt_suggestions': ENABLE_PROMPT_SUGGESTIONS,
     'models.default_metadata': DEFAULT_MODEL_METADATA,
     'models.default_params': DEFAULT_MODEL_PARAMS,
     'ui.default_user_role': DEFAULT_USER_ROLE,

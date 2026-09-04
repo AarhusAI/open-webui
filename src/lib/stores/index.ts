@@ -358,6 +358,7 @@ type Config = {
 		enable_pyodide_file_persistence?: boolean;
 		folder_max_file_count?: number;
 		websocket_heartbeat_interval?: number | null;
+		enable_prompt_suggestions: boolean;
 	};
 	oauth: {
 		providers: {
