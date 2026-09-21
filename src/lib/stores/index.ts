@@ -372,6 +372,10 @@ type Config = {
 		response_watermark?: string;
 		iframe_csp?: string;
 	};
+	tidy_feedback?: {
+		widget_url?: string;
+		api_key?: string;
+	};
 };
 
 type PromptSuggestion = {

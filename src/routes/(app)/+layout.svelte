@@ -244,6 +244,18 @@
 			return;
 		}
 
+		// Inject Tidy Feedback widget once, after login.
+		// Both the URL and the API key must be set, else nothing is injected.
+		const tidyWidgetUrl = $config?.tidy_feedback?.widget_url;
+		const tidyApiKey = $config?.tidy_feedback?.api_key;
+		if (tidyWidgetUrl && tidyApiKey && !document.getElementById('tidy-feedback-widget')) {
+			const tidyScript = document.createElement('script');
+			tidyScript.id = 'tidy-feedback-widget';
+			tidyScript.src = tidyWidgetUrl;
+			tidyScript.setAttribute('data-api-key', tidyApiKey);
+			document.head.appendChild(tidyScript);
+		}
+
 		clearChatInputStorage();
 		try {
 			await Promise.all([

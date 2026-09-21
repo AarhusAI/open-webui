@@ -70,6 +70,8 @@ from open_webui.config import (
     WEBUI_AUTH,
     WEBUI_NAME,
     async_reset_config,
+    TIDY_FEEDBACK_API_KEY,
+    TIDY_FEEDBACK_WIDGET_URL,
     import_legacy_config_json,
     seed_registered_defaults,
 )
@@ -2388,6 +2390,10 @@ async def get_app_config(request: Request):
                 'google_drive': {
                     'client_id': GOOGLE_DRIVE_CLIENT_ID,
                     'api_key': GOOGLE_DRIVE_API_KEY,
+                },
+                'tidy_feedback': {
+                    'widget_url': TIDY_FEEDBACK_WIDGET_URL,
+                    'api_key': TIDY_FEEDBACK_API_KEY,
                 },
                 'onedrive': {
                     'client_id_personal': ONEDRIVE_CLIENT_ID_PERSONAL,
