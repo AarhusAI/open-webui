@@ -555,7 +555,15 @@ async def get_builtin_tools(
         'ui.enable_user_webhooks',
         'subagents.enable',
         'subagents.background_enabled',
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        'rag.retrieval_engine',
+        # --- END EXTERNAL RETRIEVAL PATCH ---
     )
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    # With external retrieval, attached knowledge must be searched via
+    # query_knowledge_files (-> retrieval service), not read straight from SQL.
+    external_retrieval = config.get('rag.retrieval_engine') == 'external'
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 
     async def has_user_permission(feature_key: str) -> bool:
         if user.get('role') == 'admin':
@@ -620,15 +628,20 @@ async def get_builtin_tools(
                 builtin_functions.append(query_knowledge_bases)
                 builtin_functions.append(search_knowledge_bases)
         elif model_knowledge:
-            builtin_functions.extend(
-                [list_knowledge, search_knowledge_files, grep_knowledge_files, query_knowledge_files]
-            )
+            # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+            if external_retrieval:
+                builtin_functions.extend([list_knowledge, search_knowledge_files, query_knowledge_files])
+            else:
+                builtin_functions.extend(
+                    [list_knowledge, search_knowledge_files, grep_knowledge_files, query_knowledge_files]
+                )
 
-            knowledge_types = {item.get('type') for item in model_knowledge}
-            if 'file' in knowledge_types or 'collection' in knowledge_types:
-                builtin_functions.extend([view_file, view_knowledge_file])
-            if 'note' in knowledge_types:
+                knowledge_types = {item.get('type') for item in model_knowledge}
+                if 'file' in knowledge_types or 'collection' in knowledge_types:
+                    builtin_functions.extend([view_file, view_knowledge_file])
+            if 'note' in {item.get('type') for item in model_knowledge}:
                 builtin_functions.append(view_note)
+            # --- END EXTERNAL RETRIEVAL PATCH ---
         else:
             builtin_functions.extend(
                 [

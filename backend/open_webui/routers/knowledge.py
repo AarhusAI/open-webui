@@ -435,6 +435,29 @@ async def reindex_knowledge_files(
             # Don't raise, just continue
             continue
 
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    # Files attached directly to models live in file-{id}; the KB loop above
+    # never touches them. Re-ingest them (process_file without collection_name
+    # sends collection_name='file-{id}' to external ingest).
+    _cfg = await get_external_rag_config()
+    if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+        model_file_ids = {
+            k['id']
+            for m in await Models.get_all_models(db=db)
+            for k in (m.meta.model_dump().get('knowledge') or [])
+            if isinstance(k, dict) and k.get('type') == 'file' and k.get('id')
+        }
+        for fid in model_file_ids:
+            if not await Files.get_file_by_id(fid, db=db):
+                continue
+            log.info('Reindexing model-attached file %s', fid)
+            try:
+                await process_file(request, ProcessFileForm(file_id=fid), user=user, db=db)
+            except Exception as e:
+                log.error(f'Error processing model-attached file {fid}: {str(e)}')
+                failed_files.append({'file_id': fid, 'error': str(e)})
+    # --- END EXTERNAL INGESTION PATCH ---
+
     if failed_files:
         log.warning(f'Failed to process {len(failed_files)} files')
         for failed in failed_files:
