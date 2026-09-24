@@ -555,7 +555,15 @@ async def get_builtin_tools(
         'ui.enable_user_webhooks',
         'subagents.enable',
         'subagents.background_enabled',
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        'rag.retrieval_engine',
+        # --- END EXTERNAL RETRIEVAL PATCH ---
     )
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    # With external retrieval, attached knowledge must be searched via
+    # query_knowledge_files (-> retrieval service), not read straight from SQL.
+    external_retrieval = config.get('rag.retrieval_engine') == 'external'
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 
     async def has_user_permission(feature_key: str) -> bool:
         if user.get('role') == 'admin':
@@ -620,15 +628,20 @@ async def get_builtin_tools(
                 builtin_functions.append(query_knowledge_bases)
                 builtin_functions.append(search_knowledge_bases)
         elif model_knowledge:
-            builtin_functions.extend(
-                [list_knowledge, search_knowledge_files, grep_knowledge_files, query_knowledge_files]
-            )
+            # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+            if external_retrieval:
+                builtin_functions.extend([list_knowledge, search_knowledge_files, query_knowledge_files])
+            else:
+                builtin_functions.extend(
+                    [list_knowledge, search_knowledge_files, grep_knowledge_files, query_knowledge_files]
+                )
 
-            knowledge_types = {item.get('type') for item in model_knowledge}
-            if 'file' in knowledge_types or 'collection' in knowledge_types:
-                builtin_functions.extend([view_file, view_knowledge_file])
-            if 'note' in knowledge_types:
+                knowledge_types = {item.get('type') for item in model_knowledge}
+                if 'file' in knowledge_types or 'collection' in knowledge_types:
+                    builtin_functions.extend([view_file, view_knowledge_file])
+            if 'note' in {item.get('type') for item in model_knowledge}:
                 builtin_functions.append(view_note)
+            # --- END EXTERNAL RETRIEVAL PATCH ---
         else:
             builtin_functions.extend(
                 [
@@ -781,6 +794,13 @@ async def get_builtin_tools(
                 '__chat_id__': extra_params.get('__chat_id__'),
                 '__message_id__': extra_params.get('__message_id__'),
                 '__model_knowledge__': model_knowledge,
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                # Forwarded so query_knowledge_files can hand the conversation
+                # to the external retrieval service (it only reaches the tool
+                # because the tool declares __messages__ in its signature; see
+                # get_async_tool_function_and_apply_extra_params).
+                '__messages__': extra_params.get('__messages__', []),
+                # --- END EXTERNAL RETRIEVAL PATCH ---
             },
             get_builtin_function_introspection(func),
         )

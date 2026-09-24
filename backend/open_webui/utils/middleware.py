@@ -50,6 +50,11 @@ from open_webui.models.models import Models
 from open_webui.models.notes import Notes
 from open_webui.models.oauth_sessions import OAuthSessions
 from open_webui.models.users import UserModel, Users
+
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+from open_webui.retrieval.external_service import trim_messages_for_external
+
+# --- END EXTERNAL RETRIEVAL PATCH ---
 from open_webui.retrieval.utils import get_sources_from_items
 from open_webui.routers.images import (
     CreateImageForm,
@@ -1997,8 +2002,49 @@ async def chat_completion_files_handler(
         # Check if all files are in full context mode
         all_full_context = all(item.get('context') == 'full' for item in files)
 
+        # One batched SELECT instead of six sequential round trips.
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        # Moved above the query-generation block (upstream has it just before
+        # get_sources_from_items) and extended with the external-retrieval keys
+        # so the bypass decision below can reuse the same round trip.
+        # --- END EXTERNAL RETRIEVAL PATCH ---
+        rag_config = await Config.get_many(
+            'rag.top_k',
+            'rag.top_k_reranker',
+            'rag.relevance_threshold',
+            'rag.hybrid_bm25_weight',
+            'rag.enable_hybrid_search',
+            'rag.full_context',
+            # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+            'rag.retrieval_engine',
+            'rag.external_bypass_query_generation',
+            'rag.external_message_count',
+            'rag.external_user_messages_only',
+            # --- END EXTERNAL RETRIEVAL PATCH ---
+        )
+
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        # When the external retrieval service runs its own query generation,
+        # skip the LLM query-generation step and forward the (trimmed) raw
+        # conversation instead. queries stays empty -> falls through to the
+        # last-user-message fallback below.
+        bypass_external = rag_config.get('rag.retrieval_engine') == 'external' and rag_config.get(
+            'rag.external_bypass_query_generation'
+        )
+
+        messages_for_external = (
+            trim_messages_for_external(
+                body['messages'],
+                count=rag_config.get('rag.external_message_count'),
+                user_only=rag_config.get('rag.external_user_messages_only'),
+            )
+            if bypass_external
+            else None
+        )
+        # --- END EXTERNAL RETRIEVAL PATCH ---
+
         queries = []
-        if not all_full_context:
+        if not all_full_context and not bypass_external:
             try:
                 queries_response = await generate_queries(
                     request,
@@ -2043,15 +2089,6 @@ async def chat_completion_files_handler(
             queries = [get_last_user_message(body['messages']) or '']
 
         try:
-            # One batched SELECT instead of six sequential round trips.
-            rag_config = await Config.get_many(
-                'rag.top_k',
-                'rag.top_k_reranker',
-                'rag.relevance_threshold',
-                'rag.hybrid_bm25_weight',
-                'rag.enable_hybrid_search',
-                'rag.full_context',
-            )
             # Directly await async get_sources_from_items (no thread needed - fully async now)
             sources = await get_sources_from_items(
                 request=request,
@@ -2072,6 +2109,9 @@ async def chat_completion_files_handler(
                 hybrid_search=rag_config.get('rag.enable_hybrid_search'),
                 full_context=all_full_context or rag_config.get('rag.full_context'),
                 user=user,
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                messages=messages_for_external,
+                # --- END EXTERNAL RETRIEVAL PATCH ---
             )
         except Exception as e:
             log.exception(e)
@@ -3012,6 +3052,12 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                 {
                     **extra_params,
                     '__event_emitter__': event_emitter,
+                    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                    # Forward the conversation so builtin knowledge tools
+                    # (query_knowledge_files) can pass it to the external
+                    # retrieval service for its own query generation.
+                    '__messages__': form_data['messages'],
+                    # --- END EXTERNAL RETRIEVAL PATCH ---
                     '__skill_ids__': view_skill_ids,
                 },
                 features,

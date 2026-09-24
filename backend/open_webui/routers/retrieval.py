@@ -65,6 +65,10 @@ from open_webui.models.files import FileModel, Files, FileUpdateForm
 from open_webui.models.knowledge import Knowledges
 from open_webui.models.config import Config
 
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+from open_webui.retrieval.external_service import process_file_external_ingestion
+
+# --- END EXTERNAL INGESTION PATCH ---
 # Document loaders
 from open_webui.retrieval.loaders.youtube import YoutubeLoader, YoutubeTranscriptError
 from open_webui.retrieval.utils import (
@@ -358,6 +362,21 @@ RETRIEVAL_CONFIG_KEYS = {
     'RAG_EXTERNAL_RERANKER_API_KEY': 'rag.external_reranker_api_key',
     'RAG_EXTERNAL_RERANKER_TIMEOUT': 'rag.external_reranker_timeout',
     'RAG_EXTERNAL_RERANKER_URL': 'rag.external_reranker_url',
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    'RAG_RETRIEVAL_ENGINE': 'rag.retrieval_engine',
+    'RAG_EXTERNAL_RETRIEVAL_URL': 'rag.external_retrieval_url',
+    'RAG_EXTERNAL_RETRIEVAL_API_KEY': 'rag.external_retrieval_api_key',
+    'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': 'rag.external_retrieval_timeout',
+    'RAG_EXTERNAL_BYPASS_QUERY_GENERATION': 'rag.external_bypass_query_generation',
+    'RAG_EXTERNAL_MESSAGE_COUNT': 'rag.external_message_count',
+    'RAG_EXTERNAL_USER_MESSAGES_ONLY': 'rag.external_user_messages_only',
+    # --- END EXTERNAL RETRIEVAL PATCH ---
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    'EXTERNAL_INGESTION_ENGINE': 'rag.external_ingestion_engine',
+    'EXTERNAL_INGESTION_URL': 'rag.external_ingestion_url',
+    'EXTERNAL_INGESTION_API_KEY': 'rag.external_ingestion_api_key',
+    'EXTERNAL_INGESTION_TIMEOUT': 'rag.external_ingestion_timeout',
+    # --- END EXTERNAL INGESTION PATCH ---
     'RAG_FULL_CONTEXT': 'rag.full_context',
     'RAG_OLLAMA_API_KEY': 'rag.ollama.api_key',
     'RAG_OLLAMA_BASE_URL': 'rag.ollama.base_url',
@@ -686,6 +705,21 @@ async def get_rag_config(request: Request, user=Depends(get_admin_user)):
         'RAG_EXTERNAL_RERANKER_URL': config.RAG_EXTERNAL_RERANKER_URL,
         'RAG_EXTERNAL_RERANKER_API_KEY': config.RAG_EXTERNAL_RERANKER_API_KEY,
         'RAG_EXTERNAL_RERANKER_TIMEOUT': config.RAG_EXTERNAL_RERANKER_TIMEOUT,
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        'RAG_RETRIEVAL_ENGINE': config.RAG_RETRIEVAL_ENGINE,
+        'RAG_EXTERNAL_RETRIEVAL_URL': config.RAG_EXTERNAL_RETRIEVAL_URL,
+        'RAG_EXTERNAL_RETRIEVAL_API_KEY': config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+        'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+        'RAG_EXTERNAL_BYPASS_QUERY_GENERATION': config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION,
+        'RAG_EXTERNAL_MESSAGE_COUNT': config.RAG_EXTERNAL_MESSAGE_COUNT,
+        'RAG_EXTERNAL_USER_MESSAGES_ONLY': config.RAG_EXTERNAL_USER_MESSAGES_ONLY,
+        # --- END EXTERNAL RETRIEVAL PATCH ---
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        'EXTERNAL_INGESTION_ENGINE': config.EXTERNAL_INGESTION_ENGINE,
+        'EXTERNAL_INGESTION_URL': config.EXTERNAL_INGESTION_URL,
+        'EXTERNAL_INGESTION_API_KEY': config.EXTERNAL_INGESTION_API_KEY,
+        'EXTERNAL_INGESTION_TIMEOUT': config.EXTERNAL_INGESTION_TIMEOUT,
+        # --- END EXTERNAL INGESTION PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': config.TEXT_SPLITTER,
         'RAG_TOKENIZER_MODEL': config.RAG_TOKENIZER_MODEL,
@@ -924,6 +958,23 @@ class ConfigForm(BaseModel):
     RAG_EXTERNAL_RERANKER_URL: str | None = None
     RAG_EXTERNAL_RERANKER_API_KEY: str | None = None
     RAG_EXTERNAL_RERANKER_TIMEOUT: str | None = None
+
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    RAG_RETRIEVAL_ENGINE: str | None = None
+    RAG_EXTERNAL_RETRIEVAL_URL: str | None = None
+    RAG_EXTERNAL_RETRIEVAL_API_KEY: str | None = None
+    RAG_EXTERNAL_RETRIEVAL_TIMEOUT: str | None = None
+    RAG_EXTERNAL_BYPASS_QUERY_GENERATION: bool | None = None
+    RAG_EXTERNAL_MESSAGE_COUNT: int | None = None
+    RAG_EXTERNAL_USER_MESSAGES_ONLY: bool | None = None
+    # --- END EXTERNAL RETRIEVAL PATCH ---
+
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    EXTERNAL_INGESTION_ENGINE: str | None = None
+    EXTERNAL_INGESTION_URL: str | None = None
+    EXTERNAL_INGESTION_API_KEY: str | None = None
+    EXTERNAL_INGESTION_TIMEOUT: str | None = None
+    # --- END EXTERNAL INGESTION PATCH ---
 
     # Chunking settings
     TEXT_SPLITTER: str | None = None
@@ -1176,6 +1227,74 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         else config.RAG_RERANKING_BATCH_SIZE
     )
 
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    config.RAG_RETRIEVAL_ENGINE = (
+        form_data.RAG_RETRIEVAL_ENGINE if form_data.RAG_RETRIEVAL_ENGINE is not None else config.RAG_RETRIEVAL_ENGINE
+    )
+
+    config.RAG_EXTERNAL_RETRIEVAL_URL = (
+        form_data.RAG_EXTERNAL_RETRIEVAL_URL
+        if form_data.RAG_EXTERNAL_RETRIEVAL_URL is not None
+        else config.RAG_EXTERNAL_RETRIEVAL_URL
+    )
+
+    config.RAG_EXTERNAL_RETRIEVAL_API_KEY = (
+        form_data.RAG_EXTERNAL_RETRIEVAL_API_KEY
+        if form_data.RAG_EXTERNAL_RETRIEVAL_API_KEY is not None
+        else config.RAG_EXTERNAL_RETRIEVAL_API_KEY
+    )
+
+    config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT = (
+        form_data.RAG_EXTERNAL_RETRIEVAL_TIMEOUT
+        if form_data.RAG_EXTERNAL_RETRIEVAL_TIMEOUT is not None
+        else config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT
+    )
+
+    config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION = (
+        form_data.RAG_EXTERNAL_BYPASS_QUERY_GENERATION
+        if form_data.RAG_EXTERNAL_BYPASS_QUERY_GENERATION is not None
+        else config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION
+    )
+
+    config.RAG_EXTERNAL_MESSAGE_COUNT = (
+        form_data.RAG_EXTERNAL_MESSAGE_COUNT
+        if form_data.RAG_EXTERNAL_MESSAGE_COUNT is not None
+        else config.RAG_EXTERNAL_MESSAGE_COUNT
+    )
+
+    config.RAG_EXTERNAL_USER_MESSAGES_ONLY = (
+        form_data.RAG_EXTERNAL_USER_MESSAGES_ONLY
+        if form_data.RAG_EXTERNAL_USER_MESSAGES_ONLY is not None
+        else config.RAG_EXTERNAL_USER_MESSAGES_ONLY
+    )
+    # --- END EXTERNAL RETRIEVAL PATCH ---
+
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    config.EXTERNAL_INGESTION_ENGINE = (
+        form_data.EXTERNAL_INGESTION_ENGINE
+        if form_data.EXTERNAL_INGESTION_ENGINE is not None
+        else config.EXTERNAL_INGESTION_ENGINE
+    )
+
+    config.EXTERNAL_INGESTION_URL = (
+        form_data.EXTERNAL_INGESTION_URL
+        if form_data.EXTERNAL_INGESTION_URL is not None
+        else config.EXTERNAL_INGESTION_URL
+    )
+
+    config.EXTERNAL_INGESTION_API_KEY = (
+        form_data.EXTERNAL_INGESTION_API_KEY
+        if form_data.EXTERNAL_INGESTION_API_KEY is not None
+        else config.EXTERNAL_INGESTION_API_KEY
+    )
+
+    config.EXTERNAL_INGESTION_TIMEOUT = (
+        form_data.EXTERNAL_INGESTION_TIMEOUT
+        if form_data.EXTERNAL_INGESTION_TIMEOUT is not None
+        else config.EXTERNAL_INGESTION_TIMEOUT
+    )
+    # --- END EXTERNAL INGESTION PATCH ---
+
     log.info('Updating reranking model: %s to %s', config.RAG_RERANKING_MODEL, form_data.RAG_RERANKING_MODEL)
     try:
         config.RAG_RERANKING_MODEL = (
@@ -1398,6 +1517,21 @@ async def update_rag_config(request: Request, form_data: ConfigForm, user=Depend
         'RAG_EXTERNAL_RERANKER_URL': config.RAG_EXTERNAL_RERANKER_URL,
         'RAG_EXTERNAL_RERANKER_API_KEY': config.RAG_EXTERNAL_RERANKER_API_KEY,
         'RAG_EXTERNAL_RERANKER_TIMEOUT': config.RAG_EXTERNAL_RERANKER_TIMEOUT,
+        # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+        'RAG_RETRIEVAL_ENGINE': config.RAG_RETRIEVAL_ENGINE,
+        'RAG_EXTERNAL_RETRIEVAL_URL': config.RAG_EXTERNAL_RETRIEVAL_URL,
+        'RAG_EXTERNAL_RETRIEVAL_API_KEY': config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+        'RAG_EXTERNAL_RETRIEVAL_TIMEOUT': config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+        'RAG_EXTERNAL_BYPASS_QUERY_GENERATION': config.RAG_EXTERNAL_BYPASS_QUERY_GENERATION,
+        'RAG_EXTERNAL_MESSAGE_COUNT': config.RAG_EXTERNAL_MESSAGE_COUNT,
+        'RAG_EXTERNAL_USER_MESSAGES_ONLY': config.RAG_EXTERNAL_USER_MESSAGES_ONLY,
+        # --- END EXTERNAL RETRIEVAL PATCH ---
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        'EXTERNAL_INGESTION_ENGINE': config.EXTERNAL_INGESTION_ENGINE,
+        'EXTERNAL_INGESTION_URL': config.EXTERNAL_INGESTION_URL,
+        'EXTERNAL_INGESTION_API_KEY': config.EXTERNAL_INGESTION_API_KEY,
+        'EXTERNAL_INGESTION_TIMEOUT': config.EXTERNAL_INGESTION_TIMEOUT,
+        # --- END EXTERNAL INGESTION PATCH ---
         # Chunking settings
         'TEXT_SPLITTER': config.TEXT_SPLITTER,
         'RAG_TOKENIZER_MODEL': config.RAG_TOKENIZER_MODEL,
@@ -2023,28 +2157,85 @@ async def process_file(
                     await db.commit()
 
                     # External embedding API takes time (5-60s+).
-                    # Subsequent updates use fresh async sessions.
-                    # NOTE: save_docs_to_vector_db is a sync function that
-                    # calls asyncio.run_coroutine_threadsafe(..., main_loop).result()
-                    # which blocks the calling thread.  We MUST run it in a
-                    # worker thread to avoid deadlocking the event loop.
-                    result = True
-                    for name in collection_names:
-                        result = await run_in_threadpool(
-                            save_docs_to_vector_db,
-                            request,
-                            docs=docs,
-                            collection_name=name,
-                            config=config,
-                            metadata={
-                                'file_id': file.id,
-                                'name': file.filename,
-                                'hash': hash,
-                            },
-                            add=(True if form_data.collection_name else False),
-                            user=user,
+
+                    # --- BEGIN EXTERNAL INGESTION PATCH ---
+                    # When EXTERNAL_INGESTION_ENGINE == "external", delegate
+                    # chunk + embed + vector-store to the external ingestion
+                    # service. Pre-extracted content (form_data.content) keeps
+                    # the in-process pipeline; everything else (fresh upload,
+                    # KB add/update, reindex) routes to the external service,
+                    # which is idempotent per file_id via overwrite=true.
+                    _use_external_ingest = (
+                        config.EXTERNAL_INGESTION_ENGINE == 'external' and not form_data.content and bool(file.path)
+                    )
+
+                    if _use_external_ingest:
+                        _s3_bucket, _s3_key = None, None
+                        if file.path.startswith('s3://'):
+                            _without_scheme = file.path[len('s3://') :]
+                            if '/' in _without_scheme:
+                                _s3_bucket, _s3_key = _without_scheme.split('/', 1)
+
+                        # Reindex / KB-add paths skip the fresh-upload branch
+                        # above, so the local `file_path` variable may be
+                        # unset. Fetch a local copy on demand for multipart
+                        # fallback; S3 mode doesn't need it.
+                        _local_file_path = None
+                        if not _s3_bucket:
+                            try:
+                                _local_file_path = await asyncio.to_thread(Storage.get_file, file.path)
+                            except Exception:
+                                _local_file_path = None
+
+                        _timeout_str = config.EXTERNAL_INGESTION_TIMEOUT
+                        _timeout = int(_timeout_str) if _timeout_str else 300
+
+                        _ingest_result = await asyncio.to_thread(
+                            process_file_external_ingestion,
+                            url=config.EXTERNAL_INGESTION_URL,
+                            api_key=config.EXTERNAL_INGESTION_API_KEY,
+                            file_id=file.id,
+                            filename=file.filename,
+                            collection_name=collection_name,
+                            user_id=file.user_id,
+                            local_file_path=_local_file_path,
+                            s3_bucket=_s3_bucket,
+                            s3_key=_s3_key,
+                            timeout=_timeout,
                         )
-                    log.info('added %s items to collection %s', len(docs), collection_name)
+
+                        result = bool(_ingest_result and _ingest_result.get('status'))
+                        if not result:
+                            _err = (_ingest_result or {}).get('error') or 'External ingestion failed'
+                            raise Exception(_err)
+                        log.info(
+                            f'external ingestion completed for file {file.id}: '
+                            f'chunks={(_ingest_result or {}).get("chunks_count")}'
+                        )
+                    else:
+                        # Subsequent updates use fresh async sessions.
+                        # NOTE: save_docs_to_vector_db is a sync function that
+                        # calls asyncio.run_coroutine_threadsafe(..., main_loop).result()
+                        # which blocks the calling thread.  We MUST run it in a
+                        # worker thread to avoid deadlocking the event loop.
+                        result = True
+                        for name in collection_names:
+                            result = await run_in_threadpool(
+                                save_docs_to_vector_db,
+                                request,
+                                docs=docs,
+                                collection_name=name,
+                                config=config,
+                                metadata={
+                                    'file_id': file.id,
+                                    'name': file.filename,
+                                    'hash': hash,
+                                },
+                                add=(True if form_data.collection_name else False),
+                                user=user,
+                            )
+                        log.info('added %s items to collection %s', len(docs), collection_name)
+                    # --- END EXTERNAL INGESTION PATCH ---
 
                     if result:
                         # Fresh session for the final update.

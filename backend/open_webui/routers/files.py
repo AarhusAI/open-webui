@@ -39,6 +39,14 @@ from open_webui.models.files import (
 from open_webui.models.groups import Groups
 from open_webui.models.knowledge import Knowledges
 from open_webui.models.users import Users
+
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+from open_webui.retrieval.external_service import (
+    delete_file_external_ingestion,
+    get_external_rag_config,
+)
+
+# --- END EXTERNAL INGESTION PATCH ---
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
 from open_webui.routers.audio import transcribe
 from open_webui.routers.retrieval import ProcessFileForm, process_file
@@ -1042,6 +1050,28 @@ async def delete_file_by_id(
                 subject_id=id,
                 data={'filename': file.filename},
             )
+
+            # --- BEGIN EXTERNAL INGESTION PATCH ---
+            # The vector store lives behind the external ingestion service now,
+            # so the ASYNC_VECTOR_DB_CLIENT deletes above don't reach it. Notify
+            # the service so this file's chunks don't outlive the file. Kept
+            # OUTSIDE the try above (which re-raises as HTTP 400) and best-effort
+            # — a failed cleanup must never fail the user's delete.
+            _cfg = await get_external_rag_config()
+            if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+                try:
+                    _timeout = int(_cfg.EXTERNAL_INGESTION_TIMEOUT) if _cfg.EXTERNAL_INGESTION_TIMEOUT else 300
+                    await asyncio.to_thread(
+                        delete_file_external_ingestion,
+                        url=_cfg.EXTERNAL_INGESTION_URL,
+                        api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                        file_id=id,
+                        timeout=_timeout,
+                    )
+                except Exception as e:
+                    log.debug(f'external ingestion delete for {id}: {e}')
+            # --- END EXTERNAL INGESTION PATCH ---
+
             return {'message': 'File deleted successfully'}
         else:
             raise HTTPException(

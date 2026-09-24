@@ -1045,6 +1045,36 @@ RAG_EXTERNAL_RERANKER_API_KEY = os.getenv('RAG_EXTERNAL_RERANKER_API_KEY', '')
 
 RAG_EXTERNAL_RERANKER_TIMEOUT = os.getenv('RAG_EXTERNAL_RERANKER_TIMEOUT', '')
 
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+# External retrieval engine: allows delegating document search to an external HTTP service
+RAG_RETRIEVAL_ENGINE = os.getenv('RAG_RETRIEVAL_ENGINE', '')
+
+RAG_EXTERNAL_RETRIEVAL_URL = os.getenv('RAG_EXTERNAL_RETRIEVAL_URL', '')
+
+RAG_EXTERNAL_RETRIEVAL_API_KEY = os.getenv('RAG_EXTERNAL_RETRIEVAL_API_KEY', '')
+
+RAG_EXTERNAL_RETRIEVAL_TIMEOUT = os.getenv('RAG_EXTERNAL_RETRIEVAL_TIMEOUT', '')
+
+RAG_EXTERNAL_BYPASS_QUERY_GENERATION = os.getenv('RAG_EXTERNAL_BYPASS_QUERY_GENERATION', 'False').lower() == 'true'
+
+RAG_EXTERNAL_MESSAGE_COUNT = int(os.getenv('RAG_EXTERNAL_MESSAGE_COUNT', '10'))
+
+RAG_EXTERNAL_USER_MESSAGES_ONLY = os.getenv('RAG_EXTERNAL_USER_MESSAGES_ONLY', 'False').lower() == 'true'
+# --- END EXTERNAL RETRIEVAL PATCH ---
+
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+# External ingestion engine: delegates document chunking, embedding, and vector
+# storage to an external HTTP service instead of running save_docs_to_vector_db
+# in-process. Default off; set EXTERNAL_INGESTION_ENGINE=external to enable.
+EXTERNAL_INGESTION_ENGINE = os.getenv('EXTERNAL_INGESTION_ENGINE', '')
+
+EXTERNAL_INGESTION_URL = os.getenv('EXTERNAL_INGESTION_URL', '')
+
+EXTERNAL_INGESTION_API_KEY = os.getenv('EXTERNAL_INGESTION_API_KEY', '')
+
+EXTERNAL_INGESTION_TIMEOUT = os.getenv('EXTERNAL_INGESTION_TIMEOUT', '300')
+# --- END EXTERNAL INGESTION PATCH ---
+
 
 RAG_TEXT_SPLITTER = os.getenv('RAG_TEXT_SPLITTER', '')
 
@@ -2934,6 +2964,21 @@ DEFAULT_CONFIG = {
     'rag.external_reranker_url': RAG_EXTERNAL_RERANKER_URL,
     'rag.external_reranker_api_key': RAG_EXTERNAL_RERANKER_API_KEY,
     'rag.external_reranker_timeout': RAG_EXTERNAL_RERANKER_TIMEOUT,
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    'rag.retrieval_engine': RAG_RETRIEVAL_ENGINE,
+    'rag.external_retrieval_url': RAG_EXTERNAL_RETRIEVAL_URL,
+    'rag.external_retrieval_api_key': RAG_EXTERNAL_RETRIEVAL_API_KEY,
+    'rag.external_retrieval_timeout': RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+    'rag.external_bypass_query_generation': RAG_EXTERNAL_BYPASS_QUERY_GENERATION,
+    'rag.external_message_count': RAG_EXTERNAL_MESSAGE_COUNT,
+    'rag.external_user_messages_only': RAG_EXTERNAL_USER_MESSAGES_ONLY,
+    # --- END EXTERNAL RETRIEVAL PATCH ---
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    'rag.external_ingestion_engine': EXTERNAL_INGESTION_ENGINE,
+    'rag.external_ingestion_url': EXTERNAL_INGESTION_URL,
+    'rag.external_ingestion_api_key': EXTERNAL_INGESTION_API_KEY,
+    'rag.external_ingestion_timeout': EXTERNAL_INGESTION_TIMEOUT,
+    # --- END EXTERNAL INGESTION PATCH ---
     'rag.text_splitter': RAG_TEXT_SPLITTER,
     'rag.enable_markdown_header_text_splitter': ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER,
     'rag.tiktoken_encoding_name': TIKTOKEN_ENCODING_NAME,

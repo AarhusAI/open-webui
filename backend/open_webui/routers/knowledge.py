@@ -35,6 +35,14 @@ from open_webui.models.knowledge import (
 )
 from open_webui.models.models import ModelForm, Models
 from open_webui.retrieval.external import retrieve_external_knowledge, retrieve_external_knowledge_for_connection
+
+# --- BEGIN EXTERNAL INGESTION PATCH ---
+from open_webui.retrieval.external_service import (
+    delete_file_external_ingestion,
+    get_external_rag_config,
+)
+
+# --- END EXTERNAL INGESTION PATCH ---
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
 from open_webui.routers.retrieval import (
     BatchProcessFilesForm,
@@ -426,6 +434,29 @@ async def reindex_knowledge_files(
             log.error(f'Error processing knowledge base {knowledge_base.id}: {str(e)}')
             # Don't raise, just continue
             continue
+
+    # --- BEGIN EXTERNAL INGESTION PATCH ---
+    # Files attached directly to models live in file-{id}; the KB loop above
+    # never touches them. Re-ingest them (process_file without collection_name
+    # sends collection_name='file-{id}' to external ingest).
+    _cfg = await get_external_rag_config()
+    if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+        model_file_ids = {
+            k['id']
+            for m in await Models.get_all_models(db=db)
+            for k in (m.meta.model_dump().get('knowledge') or [])
+            if isinstance(k, dict) and k.get('type') == 'file' and k.get('id')
+        }
+        for fid in model_file_ids:
+            if not await Files.get_file_by_id(fid, db=db):
+                continue
+            log.info('Reindexing model-attached file %s', fid)
+            try:
+                await process_file(request, ProcessFileForm(file_id=fid), user=user, db=db)
+            except Exception as e:
+                log.error(f'Error processing model-attached file {fid}: {str(e)}')
+                failed_files.append({'file_id': fid, 'error': str(e)})
+    # --- END EXTERNAL INGESTION PATCH ---
 
     if failed_files:
         log.warning(f'Failed to process {len(failed_files)} files')
@@ -1658,6 +1689,24 @@ async def remove_file_from_knowledge_by_id(
     if delete_file and (file.user_id == user.id or user.role == 'admin'):
         await delete_file_resource(file, db)
 
+        # --- BEGIN EXTERNAL INGESTION PATCH ---
+        # File is permanently deleted here (delete_file branch), so clean up its
+        # vectors in the external ingestion service too. Best-effort, never raises.
+        _cfg = await get_external_rag_config()
+        if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+            try:
+                _timeout = int(_cfg.EXTERNAL_INGESTION_TIMEOUT) if _cfg.EXTERNAL_INGESTION_TIMEOUT else 300
+                await asyncio.to_thread(
+                    delete_file_external_ingestion,
+                    url=_cfg.EXTERNAL_INGESTION_URL,
+                    api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                    file_id=form_data.file_id,
+                    timeout=_timeout,
+                )
+            except Exception as e:
+                log.debug(f'external ingestion delete for {form_data.file_id}: {e}')
+        # --- END EXTERNAL INGESTION PATCH ---
+
     if knowledge:
         response = KnowledgeFilesResponse(
             **knowledge.model_dump(),
@@ -1999,6 +2048,24 @@ async def sync_knowledge_cleanup(
             and (file.user_id == user.id or user.role == 'admin')
         ):
             await delete_file_resource(file, db)
+
+            # --- BEGIN EXTERNAL INGESTION PATCH ---
+            # Stale file permanently deleted during sync — clean up its vectors
+            # in the external ingestion service too. Best-effort, never raises.
+            _cfg = await get_external_rag_config()
+            if _cfg.EXTERNAL_INGESTION_ENGINE == 'external' and _cfg.EXTERNAL_INGESTION_URL:
+                try:
+                    _timeout = int(_cfg.EXTERNAL_INGESTION_TIMEOUT) if _cfg.EXTERNAL_INGESTION_TIMEOUT else 300
+                    await asyncio.to_thread(
+                        delete_file_external_ingestion,
+                        url=_cfg.EXTERNAL_INGESTION_URL,
+                        api_key=_cfg.EXTERNAL_INGESTION_API_KEY,
+                        file_id=file_id,
+                        timeout=_timeout,
+                    )
+                except Exception as e:
+                    log.debug(f'external ingestion delete for {file_id}: {e}')
+            # --- END EXTERNAL INGESTION PATCH ---
 
     # ── Remove orphaned directories (children before parents) ──
     for dir_id in reversed(form_data.dir_ids):

@@ -45,6 +45,14 @@ from open_webui.models.users import UserModel
 from open_webui.retrieval.loaders.youtube import YoutubeLoader
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
 from open_webui.retrieval.external import retrieve_external_knowledge
+
+# --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+from open_webui.retrieval.external_service import (
+    get_external_rag_config,
+    query_external_retrieval,
+)
+
+# --- END EXTERNAL RETRIEVAL PATCH ---
 from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
 from open_webui.retrieval.vector.main import GetResult, SearchResult
 from open_webui.retrieval.web.utils import get_web_loader
@@ -1344,10 +1352,18 @@ async def get_sources_from_items(
     hybrid_search,
     full_context=False,
     user: UserModel | None = None,
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    messages: list | None = None,
+    # --- END EXTERNAL RETRIEVAL PATCH ---
 ):
     log.debug('items: %s %s %s %s %s', items, queries, embedding_function, reranking_function, full_context)
 
     bypass_embedding_and_retrieval = await Config.get('rag.bypass_embedding_and_retrieval')
+    # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+    # Read once per request, not per item — used in the collection-query
+    # fallback below to route search to the external retrieval service.
+    external_rag_config = await get_external_rag_config()
+    # --- END EXTERNAL RETRIEVAL PATCH ---
     extracted_collections = []
     query_results = []
     folder_items = set()
@@ -1645,6 +1661,25 @@ async def get_sources_from_items(
                     # Sync helper makes blocking VECTOR_DB_CLIENT calls;
                     # offload so the async caller's event loop stays free.
                     query_result = await asyncio.to_thread(get_all_items_from_collections, collection_names)
+                # --- BEGIN EXTERNAL RETRIEVAL PATCH ---
+                elif external_rag_config.RAG_RETRIEVAL_ENGINE == 'external':
+                    # The external retrieval service runs its own query
+                    # generation, so Open WebUI's QUERY_GENERATION_PROMPT_TEMPLATE
+                    # is intentionally NOT forwarded.
+                    # query_external_retrieval is sync (requests-based); offload
+                    # so the async caller's event loop stays free.
+                    query_result = await asyncio.to_thread(
+                        query_external_retrieval,
+                        url=external_rag_config.RAG_EXTERNAL_RETRIEVAL_URL,
+                        api_key=external_rag_config.RAG_EXTERNAL_RETRIEVAL_API_KEY,
+                        queries=queries,
+                        collection_names=list(collection_names),
+                        k=k,
+                        timeout=external_rag_config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
+                        user=user,
+                        messages=messages,
+                    )
+                # --- END EXTERNAL RETRIEVAL PATCH ---
                 else:
                     query_result = await query_collection(
                         request,
