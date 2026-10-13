@@ -3356,7 +3356,7 @@ async def query_knowledge_files(
                     collection_names=collection_names,
                     k=count,
                     timeout=external_rag_config.RAG_EXTERNAL_RETRIEVAL_TIMEOUT,
-                    user=__user__,
+                    user=user_model,
                     messages=messages_for_external,
                 )
             else:
