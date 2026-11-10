@@ -64,6 +64,12 @@ def _cutoff(days: int) -> int:
     return int(time.time()) - days * 24 * 60 * 60
 
 
+def _log_run(job: str, user, r: PruneResponse) -> None:
+    # Retention spec: one log entry per run with counts only, no content.
+    # Goes to stdout via open-webui's loguru setup, which adds the timestamp.
+    log.info(f'prune_{job}: admin_id={user.id} ' + ' '.join(f'{k}={v}' for k, v in r.model_dump().items()))
+
+
 async def _file_in_use(file_id: str, db: AsyncSession) -> bool:
     # Join with Chat so links of chats deleted in this run never count,
     # regardless of whether the FK cascade removed them.
@@ -158,13 +164,7 @@ async def prune_chats(
             else:
                 files_failed += 1
 
-        log.info(
-            f'prune_chats by {user.email}: days={days} cutoff={cutoff} '
-            f'matched={matched} deleted={deleted} failed={failed} '
-            f'files_deleted={files_deleted} files_failed={files_failed}'
-        )
-
-    return PruneChatsResponse(
+    resp = PruneChatsResponse(
         dry_run=dry_run,
         days=days,
         cutoff=cutoff,
@@ -174,6 +174,8 @@ async def prune_chats(
         files_deleted=files_deleted,
         files_failed=files_failed,
     )
+    _log_run('chats', user, resp)
+    return resp
 
 
 @router.post('/memories', response_model=PruneResponse)
@@ -207,12 +209,9 @@ async def prune_memories(
             await db.commit()
             deleted += res.rowcount
 
-        log.info(
-            f'prune_memories by {user.email}: days={days} cutoff={cutoff} '
-            f'matched={matched} deleted={deleted} failed={failed}'
-        )
-
-    return PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=failed)
+    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=failed)
+    _log_run('memories', user, resp)
+    return resp
 
 
 @router.post('/feedbacks', response_model=PruneResponse)
@@ -234,12 +233,9 @@ async def prune_feedbacks(
         await db.commit()
         deleted = res.rowcount
 
-        log.info(
-            f'prune_feedbacks by {user.email}: days={days} cutoff={cutoff} '
-            f'matched={matched} deleted={deleted} failed=0'
-        )
-
-    return PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=0)
+    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=0)
+    _log_run('feedbacks', user, resp)
+    return resp
 
 
 @router.post('/channel-messages', response_model=PruneResponse)
@@ -265,9 +261,6 @@ async def prune_channel_messages(
         await db.commit()
         deleted = res.rowcount
 
-        log.info(
-            f'prune_channel_messages by {user.email}: days={days} cutoff={cutoff} '
-            f'matched={matched} deleted={deleted} failed=0'
-        )
-
-    return PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=0)
+    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=0)
+    _log_run('channel_messages', user, resp)
+    return resp
