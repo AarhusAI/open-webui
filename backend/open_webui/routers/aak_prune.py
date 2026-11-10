@@ -9,6 +9,7 @@
 #   POST /memories         - memory rows and their user-memory vectors
 #   POST /feedbacks        - ratings; each stores a full chat copy in `snapshot`
 #   POST /channel-messages - channel messages and their reactions
+#   POST /all              - runs all of the above, so cron needs one call
 # The endpoints live in their own file so the patch only touches main.py for
 # import and registration.
 
@@ -52,6 +53,11 @@ class PruneChatsResponse(PruneResponse):
     files_deleted: int = 0
     files_failed: int = 0
 
+class PruneAllResponse(BaseModel):
+    chats: PruneChatsResponse
+    memories: PruneResponse
+    feedbacks: PruneResponse
+    channel_messages: PruneResponse
 
 def _cutoff(days: int) -> int:
     # Rows last updated before this epoch timestamp (seconds) are pruned.
@@ -70,6 +76,23 @@ async def _file_in_use(file_id: str, db: AsyncSession) -> bool:
         if (await db.execute(q)).first() is not None:
             return True
     return False
+
+@router.post('/all', response_model=PruneAllResponse)
+async def prune_all(
+    days: int = Query(..., ge=1, description='Delete data not updated for this many days'),
+    dry_run: bool = Query(False, description='Only report what would be deleted'),
+    user=Depends(get_admin_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    # Called directly, so every argument is passed explicitly (the defaults
+    # are FastAPI Query objects).
+    # noinspection PyArgumentList
+    return PruneAllResponse(
+        chats=await prune_chats(days=days, dry_run=dry_run, limit=None, user=user, db=db),
+        memories=await prune_memories(days=days, dry_run=dry_run, user=user, db=db),
+        feedbacks=await prune_feedbacks(days=days, dry_run=dry_run, user=user, db=db),
+        channel_messages=await prune_channel_messages(days=days, dry_run=dry_run, user=user, db=db),
+    )
 
 
 @router.post('/chats', response_model=PruneChatsResponse)
