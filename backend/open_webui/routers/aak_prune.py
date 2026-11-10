@@ -59,7 +59,9 @@ class PruneResponse(BaseModel):
     dry_run: bool
     days: int
     cutoff: int
-    matched: int
+    # Rows selected by the cutoff: what a real run deletes (or tries to).
+    # In a dry run this is the answer; `deleted` and `failed` stay 0.
+    would_delete: int
     deleted: int
     failed: int
 
@@ -131,8 +133,8 @@ async def _delete_file(file_id: str, path: str | None) -> bool:
 
 
 # Cron calls /all?limit=N repeatedly until chats.deleted and files.deleted are
-# both 0, so no single request is unbounded. Stop on `deleted`, not `matched`:
-# a row that keeps failing stays matched.
+# both 0, so no single request is unbounded. Stop on `deleted`, not
+# `would_delete`: a row that keeps failing is selected again on every run.
 @router.post('/all', response_model=PruneAllResponse)
 async def prune_all(
     days: int = Query(..., ge=MIN_DAYS, description='Delete data not updated for this many days'),
@@ -173,7 +175,7 @@ async def prune_chats(
 
     rows = (await db.execute(query)).all()
 
-    matched = len(rows)
+    would_delete = len(rows)
     deleted = 0
     failed = 0
 
@@ -209,7 +211,9 @@ async def prune_chats(
                 except Exception:
                     log.exception(f'prune_chats: tag cleanup failed for user {user_id}')
 
-    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=failed)
+    resp = PruneResponse(
+        dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=failed
+    )
     _log_run('chats', user, resp)
     return resp
 
@@ -223,7 +227,7 @@ async def prune_memories(
 ):
     cutoff = _cutoff(days)
     rows = (await db.execute(select(Memory.id, Memory.user_id).where(Memory.updated_at < cutoff))).all()
-    matched = len(rows)
+    would_delete = len(rows)
     deleted = 0
     failed = 0
 
@@ -251,7 +255,9 @@ async def prune_memories(
             await db.commit()
             deleted += res.rowcount
 
-    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=failed)
+    resp = PruneResponse(
+        dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=failed
+    )
     _log_run('memories', user, resp)
     return resp
 
@@ -267,7 +273,7 @@ async def prune_feedbacks(
     # chat deletion. Pruning also removes old ratings from the leaderboard.
     cutoff = _cutoff(days)
     where = Feedback.updated_at < cutoff
-    matched = (await db.execute(select(func.count()).select_from(Feedback).where(where))).scalar()
+    would_delete = (await db.execute(select(func.count()).select_from(Feedback).where(where))).scalar()
     deleted = 0
 
     if not dry_run:
@@ -275,7 +281,9 @@ async def prune_feedbacks(
         await db.commit()
         deleted = res.rowcount
 
-    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=0)
+    resp = PruneResponse(
+        dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=0
+    )
     _log_run('feedbacks', user, resp)
     return resp
 
@@ -290,7 +298,7 @@ async def prune_channel_messages(
     cutoff = _cutoff(days)
     # Message timestamps are time.time_ns().
     where = Message.updated_at < cutoff * 1_000_000_000
-    matched = (await db.execute(select(func.count()).select_from(Message).where(where))).scalar()
+    would_delete = (await db.execute(select(func.count()).select_from(Message).where(where))).scalar()
     deleted = 0
 
     if not dry_run:
@@ -303,7 +311,9 @@ async def prune_channel_messages(
         await db.commit()
         deleted = res.rowcount
 
-    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=0)
+    resp = PruneResponse(
+        dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=0
+    )
     _log_run('channel_messages', user, resp)
     return resp
 
@@ -328,7 +338,7 @@ async def prune_files(
         query = query.limit(limit)
 
     ids = (await db.execute(query)).scalars().all()
-    matched = len(ids)
+    would_delete = len(ids)
     deleted = 0
     failed = 0
 
@@ -343,6 +353,8 @@ async def prune_files(
             else:
                 failed += 1
 
-    resp = PruneResponse(dry_run=dry_run, days=days, cutoff=cutoff, matched=matched, deleted=deleted, failed=failed)
+    resp = PruneResponse(
+        dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=failed
+    )
     _log_run('files', user, resp)
     return resp
