@@ -40,26 +40,33 @@ from open_webui.models.models import Model
 from open_webui.models.notes import Note
 from open_webui.models.shared_chats import SharedChat
 from open_webui.retrieval.vector.async_client import ASYNC_VECTOR_DB_CLIENT
-from open_webui.storage.provider import Storage
+from open_webui.storage.provider import LocalStorageProvider, Storage
 from open_webui.utils.auth import get_admin_user
 from pydantic import BaseModel
 from sqlalchemy import String, and_, cast, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# The external-ingestion patch (retrieval/external_service.py) is a separate
+# patch. Without it this router must still import, and there is no external
+# index to clean.
+try:
+    from open_webui.retrieval.external_service import delete_file_external_ingestion, get_external_rag_config
+except ImportError:
+    delete_file_external_ingestion = get_external_rag_config = None
+
 log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Optional floor for `days`, so a typo in cron or a leaked admin key cannot
-# wipe recent data. Unset means no floor beyond 1 day.
-MIN_DAYS = int(os.environ.get('AAK_PRUNE_MIN_DAYS', '1'))
+# Floor for `days`, so a typo in cron or a leaked admin key cannot wipe
+# recent data. Defaults to 7 days when AAK_PRUNE_MIN_DAYS is unset.
+MIN_DAYS = int(os.environ.get('AAK_PRUNE_MIN_DAYS', '7'))
 
 
 class PruneResponse(BaseModel):
     dry_run: bool
     days: int
     cutoff: int
-    # Rows selected by the cutoff: what a real run deletes (or tries to).
     # In a dry run this is the answer; `deleted` and `failed` stay 0.
     would_delete: int
     deleted: int
@@ -91,18 +98,14 @@ def _unreferenced_file(cutoff: int):
     # hold the file id only inside JSON, as a bare id or as
     # /api/v1/files/{id}/content. File ids are server-generated uuids, so the
     # text match can only over-match, which keeps the file.
-    # ponytail: the JSON text scans are sequential (seconds on a few thousand
-    # files); add a file-reference table if the sweep gets too slow.
     refs = [
-        # Join Chat: on SQLite the FK cascade is not enforced, so links of
-        # deleted chats may linger.
+        # Join Chat
         select(ChatFile.id).join(Chat, Chat.id == ChatFile.chat_id).where(ChatFile.file_id == File.id),
         select(KnowledgeFile.id).where(KnowledgeFile.file_id == File.id),
         # Uploaded for a knowledge base that still exists but not linked
         # (pending or failed processing): knowledge-base files are never pruned.
         select(Knowledge.id).where(Knowledge.id == File.meta['data']['knowledge_id'].as_string()),
         select(ChannelFile.id).where(ChannelFile.file_id == File.id),
-        # ponytail: scans only the file owner's chats to use the user_id index;
         # another user's clone of a shared chat does not keep the file alive
         # (upstream grants that user no access once the source chat is gone).
         select(Chat.id).where(Chat.user_id == File.user_id, cast(Chat.chat, String).contains(File.id)),
@@ -118,23 +121,39 @@ async def _delete_file(file_id: str, path: str | None) -> bool:
     # Row last: if vectors or the blob fail, the row stays and the next run
     # retries. Upstream's delete_file_resource swallows those errors and
     # deletes the row anyway, which would orphan the blob for good.
-    # ponytail: relies on idempotent blob delete (S3, local). GCS and Azure
-    # raise for a missing blob, so such a row would fail on every run.
     try:
         collection = f'file-{file_id}'
         if await ASYNC_VECTOR_DB_CLIENT.has_collection(collection_name=collection):
             await ASYNC_VECTOR_DB_CLIENT.delete_collection(collection_name=collection)
+        if delete_file_external_ingestion is not None:
+            # With external ingestion the file's chunks live behind that
+            # service, not in ASYNC_VECTOR_DB_CLIENT. The service answers 200
+            # for unknown ids too and the helper returns None on any error,
+            # so None means "not deleted": keep the row and retry next run.
+            cfg = await get_external_rag_config()
+            if cfg.EXTERNAL_INGESTION_ENGINE == 'external' and cfg.EXTERNAL_INGESTION_URL:
+                res = await asyncio.to_thread(
+                    delete_file_external_ingestion,
+                    url=cfg.EXTERNAL_INGESTION_URL,
+                    api_key=cfg.EXTERNAL_INGESTION_API_KEY,
+                    file_id=file_id,
+                    timeout=int(cfg.EXTERNAL_INGESTION_TIMEOUT or 300),
+                )
+                if res is None:
+                    raise RuntimeError('external ingestion delete failed')
         if path:
-            await asyncio.to_thread(Storage.delete_file, path)
+            # Rows uploaded before the storage provider was switched (local
+            # -> S3) still hold a local path. The remote provider cannot
+            # parse it, so the row would fail on every run. Remote paths
+            # always carry a scheme (s3://, gs://, https://).
+            delete_blob = Storage.delete_file if '://' in path else LocalStorageProvider.delete_file
+            await asyncio.to_thread(delete_blob, path)
         return await Files.delete_file_by_id(file_id)
     except Exception:
         log.exception(f'prune_files: delete failed for file {file_id}')
         return False
 
 
-# Cron calls /all?limit=N repeatedly until chats.deleted and files.deleted are
-# both 0, so no single request is unbounded. Stop on `deleted`, not
-# `would_delete`: a row that keeps failing is selected again on every run.
 @router.post('/all', response_model=PruneAllResponse)
 async def prune_all(
     days: int = Query(..., ge=MIN_DAYS, description='Delete data not updated for this many days'),
@@ -143,9 +162,6 @@ async def prune_all(
     user=Depends(get_admin_user),
     db: AsyncSession = Depends(get_async_session),
 ):
-    # Called directly, so every argument is passed explicitly (the defaults
-    # are FastAPI Query objects). Files run last, so files released by the
-    # earlier steps are swept in the same call.
     # noinspection PyArgumentList
     return PruneAllResponse(
         chats=await prune_chats(days=days, dry_run=dry_run, limit=limit, user=user, db=db),
@@ -211,6 +227,7 @@ async def prune_chats(
                 except Exception:
                     log.exception(f'prune_chats: tag cleanup failed for user {user_id}')
 
+    # noinspection PyArgumentList
     resp = PruneResponse(
         dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=failed
     )
@@ -218,6 +235,8 @@ async def prune_chats(
     return resp
 
 
+# Memories are not part of /all: there is no way of knowing when a memory was
+# last used. The endpoint is mostly here for completeness.
 @router.post('/memories', response_model=PruneResponse)
 async def prune_memories(
     days: int = Query(..., ge=MIN_DAYS, description='Delete memories not updated for this many days'),
@@ -353,6 +372,7 @@ async def prune_files(
             else:
                 failed += 1
 
+    # noinspection PyArgumentList
     resp = PruneResponse(
         dry_run=dry_run, days=days, cutoff=cutoff, would_delete=would_delete, deleted=deleted, failed=failed
     )
