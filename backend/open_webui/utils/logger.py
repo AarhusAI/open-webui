@@ -153,6 +153,8 @@ def file_format(record: 'Record'):
         'audit_level': record['extra'].get('audit_level', ''),
         'verb': record['extra'].get('verb', ''),
         'request_uri': record['extra'].get('request_uri', ''),
+        'action': record['extra'].get('action'),
+        'route': record['extra'].get('route'),
         'response_status_code': record['extra'].get('response_status_code', 0),
         'source_ip': record['extra'].get('source_ip', ''),
         'user_agent': record['extra'].get('user_agent', ''),

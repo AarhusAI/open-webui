@@ -23,6 +23,7 @@ from asgiref.typing import (
 from asgiref.typing import (
     Scope as ASGIScope,
 )
+from fastapi.routing import APIRoute
 from loguru import logger
 from open_webui.env import AUDIT_INCLUDED_PATHS, AUDIT_LOG_LEVEL, ENABLE_AUDIT_GET_REQUESTS, MAX_BODY_LOG_SIZE
 from open_webui.models.users import UserModel
@@ -43,6 +44,9 @@ class AuditLogEntry:
     request_uri: str
     user_agent: Optional[str] = None
     source_ip: Optional[str] = None
+    # Matched FastAPI route; None for unrouted requests and static/ws mounts
+    action: Optional[str] = None  # route name, e.g. "create_new_chat"
+    route: Optional[str] = None  # path template, e.g. "/api/v1/chats/{id}"
     # `Request` audit level properties
     request_object: Any = None
     # `Request Response` level
@@ -176,6 +180,8 @@ class AuditLoggingMiddleware:
         async with self._audit_context(request) as context:
 
             async def send_wrapper(message: ASGISendEvent) -> None:
+                if message['type'] == 'http.response.start':
+                    context.metadata['response_status_code'] = message['status']
                 if self.audit_level == AuditLevel.REQUEST_RESPONSE:
                     await self._capture_response(message, context)
 
@@ -289,12 +295,16 @@ class AuditLoggingMiddleware:
                     request_body,
                 )
 
+            matched = request.scope.get('route')
+            matched = matched if isinstance(matched, APIRoute) else None
             entry = AuditLogEntry(
                 id=str(uuid.uuid4()),
                 user=user,
                 audit_level=self.audit_level.value,
                 verb=request.method,
                 request_uri=str(request.url),
+                action=matched.name if matched else None,
+                route=matched.path if matched else None,
                 response_status_code=context.metadata.get('response_status_code', None),
                 source_ip=request.client.host if request.client else None,
                 user_agent=request.headers.get('user-agent'),
