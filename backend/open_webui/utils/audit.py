@@ -1,3 +1,4 @@
+import json
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -47,6 +48,8 @@ class AuditLogEntry:
     # Matched FastAPI route; None for unrouted requests and static/ws mounts
     action: Optional[str] = None  # route name, e.g. "create_new_chat"
     route: Optional[str] = None  # path template, e.g. "/api/v1/chats/{id}"
+    # Ids of the items that the request reads or changes: [{"type": <parameter name>, "uid": <id>}]
+    resources: Optional[list[dict[str, str]]] = None
     # `Request` audit level properties
     request_object: Any = None
     # `Request Response` level
@@ -117,6 +120,19 @@ class AuditContext:
             self.response_body.extend(chunk[: self.max_body_size - len(self.response_body)])
 
 
+def _body_id(body: str) -> Optional[str]:
+    """Return the top-level `id` of a JSON object body, or None."""
+    try:
+        data = json.loads(body)
+        value = data.get('id') if isinstance(data, dict) else None
+        return str(value) if value else None
+    except ValueError:
+        # ponytail: a truncated body (MAX_BODY_LOG_SIZE) gives an id only when `id` is the first key.
+        # Pydantic responses satisfy this. Increase MAX_BODY_LOG_SIZE if a request body does not.
+        match = re.match(r'\s*\{\s*"id"\s*:\s*"([^"]+)"', body)
+        return match.group(1) if match else None
+
+
 class AuditLoggingMiddleware:
     """
     ASGI middleware that intercepts HTTP requests and responses to perform audit logging. It captures request/response bodies (depending on audit level), headers, HTTP methods, and user information, then logs a structured audit entry at the end of the request cycle.
@@ -182,8 +198,8 @@ class AuditLoggingMiddleware:
             async def send_wrapper(message: ASGISendEvent) -> None:
                 if message['type'] == 'http.response.start':
                     context.metadata['response_status_code'] = message['status']
-                if self.audit_level == AuditLevel.REQUEST_RESPONSE:
-                    await self._capture_response(message, context)
+                # Capture at each level: the bodies supply the item ids (limit: max_body_size).
+                await self._capture_response(message, context)
 
                 await send(message)
 
@@ -193,11 +209,7 @@ class AuditLoggingMiddleware:
                 nonlocal original_receive
                 message = await original_receive()
 
-                if self.audit_level in (
-                    AuditLevel.REQUEST,
-                    AuditLevel.REQUEST_RESPONSE,
-                ):
-                    await self._capture_request(message, context)
+                await self._capture_request(message, context)
 
                 return message
 
@@ -297,6 +309,12 @@ class AuditLoggingMiddleware:
 
             matched = request.scope.get('route')
             matched = matched if isinstance(matched, APIRoute) else None
+            # Precedence: path parameters, query `id`, request body `id`, response body `id`.
+            # A value occurs one time only.
+            ids = {key: str(value) for key, value in request.path_params.items()}
+            for candidate in (request.query_params.get('id'), _body_id(request_body), _body_id(response_body)):
+                if candidate and candidate not in ids.values():
+                    ids.setdefault('id', candidate)
             entry = AuditLogEntry(
                 id=str(uuid.uuid4()),
                 user=user,
@@ -305,11 +323,14 @@ class AuditLoggingMiddleware:
                 request_uri=str(request.url),
                 action=matched.name if matched else None,
                 route=matched.path if matched else None,
+                resources=[{'type': key, 'uid': value} for key, value in ids.items()] or None,
                 response_status_code=context.metadata.get('response_status_code', None),
                 source_ip=request.client.host if request.client else None,
                 user_agent=request.headers.get('user-agent'),
-                request_object=request_body,
-                response_object=response_body,
+                request_object=request_body
+                if self.audit_level in (AuditLevel.REQUEST, AuditLevel.REQUEST_RESPONSE)
+                else '',
+                response_object=response_body if self.audit_level == AuditLevel.REQUEST_RESPONSE else '',
             )
 
             self.audit_logger.write(entry)

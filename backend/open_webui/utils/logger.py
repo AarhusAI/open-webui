@@ -155,6 +155,7 @@ def file_format(record: 'Record'):
         'request_uri': record['extra'].get('request_uri', ''),
         'action': record['extra'].get('action'),
         'route': record['extra'].get('route'),
+        'resources': record['extra'].get('resources'),
         'response_status_code': record['extra'].get('response_status_code', 0),
         'source_ip': record['extra'].get('source_ip', ''),
         'user_agent': record['extra'].get('user_agent', ''),
